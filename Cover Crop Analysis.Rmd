@@ -1,0 +1,2895 @@
+---
+title: "Cover Crop Data Analysis"
+author: "Hayley Brackenridge"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: simplex
+    highlight: tango
+    toc: TRUE
+    toc_depth: 4
+---
+
+#Preamble
+
+This markdown contains analysis of data from the Roller-Crimper project conducted in Agassiz BC, St-Jean-sur-Richelieu QC, and Harrow ON in 2019, 2020, and 2021.
+
+#VAR
+
+## Load datasets
+
+There are two data files from this project.
+
+The first, named dat, contains rye stand counts, rye anthesis, rye biomass, rye tillers, rye stem diameter, rye mortality & pop ups after crimping, sweet corn stand, sweet corn height, sweet corn injury, sweet corn VT date, and sweet corn yield for only the core 8 treatments -> W & WF no rye, W rye (no WF rye or 2N).
+
+datw is a version of dat that contains WF treatments for all rye treatments (uneven treatment numbers across locations & years).
+datr is a version of datw that contains only rye treatments, no controls.
+
+The second data file, named wdat, contains weed measurement timing, quadrat, count, stage, and biomass. 
+
+
+```{r load datasets, results='hide', message=FALSE, warning=FALSE, 'load-data-&-packages'}
+# load datasets
+dat<- read.csv("VAR_All.csv")
+str(dat) # view data variables & adjust type as necessary
+dat$Plot<- as.factor(dat$Plot)
+dat$Rep<- as.factor(dat$Rep)
+dat$SR<- as.factor(dat$SR)
+dat$VT_date<- as.Date(dat$VT_date, "%Y-%m-%d")
+dat$VT_date<- format(dat$VT_date, "%j")
+dat$VT_date<- as.integer(dat$VT_date, "%j")
+
+dat<- subset(dat, Nitro=="1") # remove 2N trt
+
+datwf<- dat # datwf contains all trts, including WF rye
+
+dat<- subset(dat, Trt_num<9) # remove WF rye trts
+
+datr<- subset(dat, Cult!="NA") # datr contains only trt plots
+
+wdat<- read.csv("VAR_Weeds.csv")
+str(wdat) # view data variables & adjust type as necessary
+wdat$Plot<- as.factor(wdat$Plot)
+wdat$Rep<- as.factor(wdat$Rep)
+wdat$Trt_num<- as.factor(wdat$Trt_num)
+wdat$SR<- as.factor(wdat$SR)
+
+wdat<- subset(wdat, Nitro=="1")
+
+# load packages
+library(ggplot2)
+library(dplyr)
+library(car)
+library(lme4)
+library(lmerTest)
+library(ggpubr)
+library(lsmeans)
+library(emmeans)
+```
+
+The data was subsetted to only include the treatment Nitrogen = 1X
+
+
+## Analysis
+
+For each variable, a graph was created plotting the variable against cultivar, coloured by seeding rate, and facetted by location & year. This was to get a general sense of the trends in the data & look for any anomalies or potential errors.
+
+From there, a full model was created with cultivar, seeding rate, and location as fixed effects, and rep & year as random effects to test whether the treatments were different from the control. 
+
+The full model was reduced using the function `lmerTest::step()` which applies a backward model reduction approach using the Satterthwaite degrees of freedom method. This function does **not** work on `glmer()` so those required manual reduction.
+
+The simplified model was resaved as `model.x.best`.
+
+A summary table and anova table of the best model was produced to obtain p-values for each fixed effect. 
+
+Model assumptions were tested using a Shapiro-Wilk Test and by visual inspection of the following diagnostic plots of residuals: Predicted vs Actual Residuals, Histogram of Residuals, and Q-Q Plot. 
+
+If model assumptions were not well met, a note has been added and I will further investigate whether a transformation is needed.
+
+If model assumptions were met, `emmeans()` was used to compare treatment & control means.
+
+Then, the control was dropped and the model ran again to test the differences between treatments. 
+
+The process of model reduction, assumption testing, & means comparisons was repeated for the treatment model.
+
+
+Statistical design is an incomplete RBD with cultivar & seeding rate as factorial, weedy & weed-free no rye plots, & weed-free rye plots for some treatments at some locations. The model is:
+
+Y = $\mu$ + block + cult * SR * Location + (1 | Rep : Year) + e
+
+
+
+### Rye biomass
+
+```{r rye biomass}
+dat$Rye_wt
+
+# plot of rye biomass by cultivar & seeding rate, separated by location & year
+ryewtplot1<- ggplot(subset(dat, Cult=="Standard"|Cult=="Early"), aes(x = SR, y = Rye_wt, fill=Cult)) +
+          geom_boxplot() +
+          theme_bw()
+print(ryewtplot1)
+
+ryewtplot1<- ggplot(subset(dat, Cult=="Standard"|Cult=="Early"), aes(x = SR, y = Rye_wt, fill=Cult)) +
+          geom_boxplot() +
+          facet_wrap(Year~Location)+
+          theme_bw()
+print(ryewtplot1)
+
+# model analysis for rye biomass
+model.ryewt<- lmer(Rye_wt ~ Cult * SR * Location + ( 1 | Rep:Year), data=dat)
+summary(model.ryewt)
+anova(model.ryewt)
+
+model.ryewt.best<- get_model(lmerTest::step(model.ryewt, reduce.random=F))
+summary(model.ryewt.best)
+anova(model.ryewt.best)
+
+# check residuals
+resid.model.ryewt<- resid(model.ryewt.best)
+pred.model.ryewt<- predict(model.ryewt.best)
+
+# check randomness
+plot(pred.model.ryewt, resid.model.ryewt, ylab="Residuals", xlab="Rye Weight", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.ryewt, main="Histogram of Residuals", xlab="Rye wt")
+
+qqnorm(resid.model.ryewt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.ryewt)
+# test assumptions fine
+
+# means
+ryewtemmeans1<- emmeans(model.ryewt.best, pairwise ~ Location)
+ryewtemmeans1 # Harrow & StJean are not different from each other, Agassiz lower than both
+plot(ryewtemmeans1, comparisons=T)
+
+ryewtemmeans2<- emmeans(model.ryewt.best, pairwise ~ SR)
+ryewtemmeans2 # 600 > 150, 150 & 300 not different, 300 & 600 not different (no signif diffs when WF rye plots removed)
+plot(ryewtemmeans2, comparisons=T)
+
+# (Cult not signif in model when WF no rye plots removed)
+ryewtemmeans3<- emmeans(model.ryewt.best, pairwise ~ Cult)
+ryewtemmeans3 # Early greater than standard
+plot(ryewtemmeans3, comparisons=T)
+```
+
+
+### Rye tillers
+
+```{r rye tillers}
+dat$TAv
+
+# plot of rye tillers by cultivar & seeding rate, separated by location & year
+tillplot1<- ggplot(subset(dat, Cult=="Standard"|Cult=="Early"), aes(x = Cult, y = TAv, fill=factor(SR))) +
+          geom_boxplot() +
+          facet_wrap(Year~Location)+
+          theme_bw()
+print(tillplot1)
+# huge outlier -- St Jean 2019 plot 307 (TAv = 14.333)
+
+# model analysis for rye tillering
+model.till<- lmer(TAv ~ Cult * SR * Location + ( 1 | Rep:Year), data=dat)
+summary(model.till)
+anova(model.till)
+
+model.till.best<- get_model(lmerTest::step(model.till, reduce.random=F))
+summary(model.till.best)
+anova(model.till.best)
+
+# check residuals
+resid.model.till<- resid(model.till.best)
+pred.model.till<- predict(model.till.best)
+
+# check randomness
+plot(pred.model.till, resid.model.till, ylab="Residuals", xlab="Rye tillers", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.till, main="Histogram of Residuals", xlab="Rye tillers")
+# one value very far to right -> outlier from St Jean 2019 307?
+
+qqnorm(resid.model.till) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.till)
+# test assumptions not okay -> try removing outlier
+
+
+## hard-removing outlier as quick fix, saving under different dataframe
+### large datpoint at StJean 2019 307 TAv=14
+max(dat$TAv, na.rm=T)
+Toutlier.rm<- dat[-c(grep("14", dat$TAv)),]
+# check that data point doesn't exist in new dataset
+grep("14", Toutlier.rm$TAv)
+
+
+# redo above analysis without StJean 2019 307 outlier
+# plot of rye tillers by cultivar & seeding rate, separated by location & year
+tillplot2<- ggplot(subset(Toutlier.rm, Cult=="Standard"|Cult=="Early"), aes(x = Cult, y = TAv, fill=factor(SR))) +
+          geom_boxplot() +
+          facet_wrap(Year~Location)+
+          theme_bw()
+print(tillplot2)
+# still  some outliers in Harrow 2020 & 2019 data
+
+# model analysis for rye tillering
+model.till2<- lmer(TAv ~ Cult * SR * Location + ( 1 | Rep:Year), data=Toutlier.rm)
+summary(model.till2)
+anova(model.till2)
+
+model.till.best2<- get_model(lmerTest::step(model.till2, reduce.random=F))
+summary(model.till.best2)
+anova(model.till.best2)
+
+# check residuals
+resid.model.till2<- resid(model.till.best2)
+pred.model.till2<- predict(model.till.best2)
+
+# check randomness
+plot(pred.model.till2, resid.model.till2, ylab="Residuals", xlab="Rye tillers", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.till2, main="Histogram of Residuals", xlab="Rye tillers")
+
+qqnorm(resid.model.till2) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.till2)
+# test assumptions fine
+
+tillemmeans1<- emmeans(model.till.best2, pairwise ~ SR|Location)
+tillemmeans1
+plot(tillemmeans1, comparisons=T)
+
+tillemmeans2<- emmeans(model.till.best2, pairwise ~ Cult|Location)
+tillemmeans2
+plot(tillemmeans2, comparisons=T)
+```
+
+
+### Rye stem diameter
+
+```{r rye stem diam}
+dat$DiamAv
+
+# plot of rye stem diameter by cultivar & seeding rate, separated by year, Harrow only
+diamdat<- subset(dat, Location=="Harrow") # subset data to only include Harrow b/c diameter only measured in Harrow
+diamplot1<- ggplot(subset(diamdat, Cult=="Standard"|Cult=="Early"), aes(x = Cult, y = DiamAv, fill=factor(SR))) +
+          geom_boxplot() +
+          facet_wrap(~Year, ncol=1)+
+          theme_bw()
+print(diamplot1)
+
+# model analysis for rye stem diameter
+model.diam<- lmer(DiamAv ~ Cult * SR + ( 1 | Rep:Year), data=diamdat)
+summary(model.diam)
+anova(model.diam)
+
+model.diam.best<- get_model(lmerTest::step(model.diam, reduce.random=F))
+summary(model.diam.best)
+anova(model.diam.best)
+
+# check residuals
+resid.model.diam<- resid(model.diam.best)
+pred.model.diam<- predict(model.diam.best)
+
+# check randomness
+plot(pred.model.diam, resid.model.diam, ylab="Residuals", xlab="Rye stem diameter", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.diam, main="Histogram of Residuals", xlab="Rye stem diameter")
+
+qqnorm(resid.model.diam) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.diam)
+# assumptions fine
+
+diamemmeans1<- emmeans(model.diam.best, pairwise ~ Cult)
+diamemmeans1
+plot(diamemmeans1, comparisons=T)
+
+diamemmeans2<- emmeans(model.diam.best, pairwise ~ SR)
+diamemmeans2
+plot(diamemmeans2, comparisons=T)
+```
+
+
+### Corn stand
+
+```{r corn stand}
+dat$Corn_stand
+
+# plot of corn stand by cultivar & seeding rate, separated by location & year
+standplot1<- ggplot(dat, aes(x = Trt_code, y = Corn_stand, fill=factor(SR))) +
+          geom_boxplot() +
+          facet_wrap(Location~Year)+
+          theme_bw()
+print(standplot1)
+```
+
+``` {r corn stand analysis -- trt vs ctrl}
+# model analysis for corn stand 
+
+# test effect of rye
+model.stand<- lmer(Corn_stand ~ Trt_code * Location + ( 1 | Rep:Year), data=dat)
+summary(model.stand)
+anova(model.stand)
+
+model.stand.best<- get_model(lmerTest::step(model.stand, reduce.random=F))
+summary(model.stand.best)
+Anova(model.stand.best, type="III")
+
+# check residuals
+resid.model.stand<- resid(model.stand.best)
+pred.model.stand<- predict(model.stand.best)
+
+# check randomness
+plot(pred.model.stand, resid.model.stand, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.stand, main="Histogram of Residuals", xlab="Corn stand")
+# long tails on left
+
+qqnorm(resid.model.stand) # messy on ends
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.stand)
+# data assumptions not great... try transformations
+
+standemmeans<- emmeans(model.stand.best, pairwise ~ Trt_code)
+standemmeans
+plot(standemmeans, comparisons=T)
+# some trts higher than W1N
+```
+
+```{r corn stand analysis -- trts}
+# test effect of trts
+model.standtrt<- lmer(Corn_stand ~ Cult * SR * Location + ( 1 | Rep:Year), data=datr)
+summary(model.standtrt)
+anova(model.standtrt)
+
+model.standtrt.best<- get_model(lmerTest::step(model.standtrt, reduce.random=F))
+summary(model.standtrt.best)
+Anova(model.standtrt.best, type="III")
+
+# check residuals
+resid.model.standtrt<- resid(model.standtrt.best)
+pred.model.standtrt<- predict(model.standtrt.best)
+
+# check randomness
+plot(pred.model.standtrt, resid.model.standtrt, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.standtrt, main="Histogram of Residuals", xlab="Corn stand")
+# long tails on left
+
+qqnorm(resid.model.standtrt) # messy on ends
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.standtrt)
+# data assumptions not great... try transformations
+
+standremmeans<- emmeans(model.stand.best, pairwise ~ Location)
+standremmeans
+plot(standremmeans, comparisons=T) # Harrow > Agassiz & StJean
+
+# transformations (none really helped)
+model.standtrt2<- lmer((Corn_stand)^1/3 ~ Cult * SR * Location + ( 1 | Rep:Year), data=datr)
+summary(model.standtrt2)
+anova(model.standtrt2)
+
+model.standtrt.best2<- get_model(lmerTest::step(model.standtrt2, reduce.random=F))
+summary(model.standtrt.best2)
+Anova(model.standtrt.best2, type="III")
+
+# check residuals
+resid.model.standtrt2<- resid(model.standtrt.best2)
+pred.model.standtrt2<- predict(model.standtrt.best2)
+
+# check randomness
+plot(pred.model.standtrt2, resid.model.standtrt2, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.standtrt2, main="Histogram of Residuals", xlab="Corn stand")
+# long tails on left
+
+qqnorm(resid.model.standtrt2) # messy on ends
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.standtrt2)
+
+```
+
+
+### Corn height
+
+```{r corn ht}
+dat$Corn_ht_av
+
+# plot of average corn height by cultivar & seeding rate, separated by location & year
+htplot1<- ggplot(dat, aes(x = Trt_code, y = Corn_ht_av, fill=factor(SR))) +
+          geom_boxplot() +
+          facet_wrap(Location~Year)+
+          theme_bw()
+print(htplot1)
+```
+
+```{r corn ht analysis -- trt vs ctrl}
+# model analysis for average corn height
+
+# test effect of trts vs ctrls
+model.ht<- lmer(Corn_ht_av ~ Trt_code * Location + ( 1 | Rep:Year), data=dat)
+summary(model.ht)
+anova(model.ht)
+
+htemmeans<- emmeans(model.ht, pairwise ~ Trt_code|Location)
+htemmeans
+plot(htemmeans, comparisons=T) # crtls higher than most trts in StJean & Harrow, not in Agassiz
+
+model.ht.best<- get_model(lmerTest::step(model.ht, reduce.random=F))
+summary(model.ht.best)
+anova(model.ht.best)
+
+# check residuals
+resid.model.ht<- resid(model.ht.best)
+pred.model.ht<- predict(model.ht.best)
+
+# check randomness
+plot(pred.model.ht, resid.model.ht, ylab="Residuals", xlab="Average corn height", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.ht, main="Histogram of Residuals", xlab="Average corn height")
+
+qqnorm(resid.model.ht) # 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.ht)
+```
+
+```{r corn ht analysis -- trts}
+# trt effect
+model.ht.trt<- lmer(Corn_ht_av ~ Cult * SR * Location + ( 1 | Rep:Year), data=datr)
+summary(model.ht.trt)
+anova(model.ht.trt)
+
+model.ht.trt.best<- get_model(lmerTest::step(model.ht.trt, reduce.random=F))
+summary(model.ht.trt.best)
+anova(model.ht.trt.best)
+
+# check residuals
+resid.model.httrt<- resid(model.ht.trt.best)
+pred.model.httrt<- predict(model.ht.trt.best)
+
+# check randomness
+plot(pred.model.httrt, resid.model.httrt, ylab="Residuals", xlab="Average corn height", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.httrt, main="Histogram of Residuals", xlab="Average corn height")
+
+qqnorm(resid.model.httrt) # messy on ends
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.httrt)
+
+# means
+htemmeans1<- emmeans(model.ht.trt.best, pairwise ~ Location)
+htemmeans1
+plot(htemmeans1, comparisons=T) # Harrow > Agassiz > StJean
+```
+
+```{r corn ht analysis -- w vs wf trts}
+
+```
+
+
+### Marketable corn count
+
+```{r M corn count}
+dat$M_count
+
+# plot of marketable cob count by cultivar & seeding rate, separated by location & year
+Mplot1<- ggplot(dat, aes(x = Trt_code, y = M_count, fill=factor(SR))) +
+          geom_boxplot() +
+          facet_wrap(Location~Year)+
+          theme_bw()
+print(Mplot1)
+```
+
+```{r M corn count analysis -- trt vs ctrl}
+# model analysis for marketable corn count trts vs ctrls
+model.M<- lmer(M_count ~ Trt_code * Location + ( 1 | Rep:Year), data=dat)
+summary(model.M)
+anova(model.M)
+
+model.M.best<- get_model(lmerTest::step(model.M, reduce.random=F))
+summary(model.M.best)
+anova(model.M.best)
+
+# check residuals
+resid.model.M<- resid(model.M.best)
+pred.model.M<- predict(model.M.best)
+
+# check randomness
+plot(pred.model.M, resid.model.M, ylab="Residuals", xlab="Marketable cob count", main="Predictecd vs Residuals")
+# large separation
+
+# check normality
+hist(resid.model.M, main="Histogram of Residuals", xlab="Marketable cob count")
+# outlier? -> WF?
+
+qqnorm(resid.model.M) # messy on ends
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.M)
+
+# means
+Mcountemmeans<- emmeans(model.M.best, pairwise ~ Trt_code)
+Mcountemmeans
+plot(Mcountemmeans, comparisons=T) # WF > trts & W (W slightly lower than trts, not signif)
+```
+
+```{r M corn count analysis -- trts}
+# model analysis for marketable corn count trts
+model.M.trt<- lmer(M_count ~ Cult * SR * Location + ( 1 | Rep:Year), data=datr)
+summary(model.M.trt)
+anova(model.M.trt)
+
+model.M.trt.best<- get_model(lmerTest::step(model.M.trt, reduce.random=F))
+summary(model.M.trt.best)
+anova(model.M.trt.best)
+
+# check residuals
+resid.model.Mtrt<- resid(model.M.trt.best)
+pred.model.Mtrt<- predict(model.M.trt.best)
+
+# check randomness
+plot(pred.model.Mtrt, resid.model.Mtrt, ylab="Residuals", xlab="Marketable cob count", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.Mtrt, main="Histogram of Residuals", xlab="Marketable cob count")
+
+qqnorm(resid.model.Mtrt) # messy on ends
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.Mtrt)
+# not great -> few high values
+
+# means
+Mcountemmeans1<- emmeans(model.M.best, pairwise ~ Location)
+Mcountemmeans1
+plot(Mcountemmeans1, comparisons=T) # Harrow > Agassiz & StJean
+```
+
+```{r M corn count analysis -- w vs wf trts}
+
+```
+
+
+### Marketable corn weight
+
+```{r M corn wt}
+# plot of marketable cob weight by cultivar & seeding rate, separated by location & year
+Mwtplot1<- ggplot(dat, aes(x = Trt_code, y = M_wt, fill=factor(SR))) +
+          geom_boxplot() +
+          facet_wrap(Location~Year)+
+          theme_bw()
+print(Mwtplot1)
+```
+
+```{r M corn wt analysis -- trt vs ctrl}
+# model analysis for marketable cob weight trt vs ctrl
+model.Mwt<- lmer(M_wt ~ Trt_code * Location + ( 1 | Rep:Year), data=dat)
+summary(model.Mwt)
+anova(model.Mwt)
+
+model.Mwt.best<- get_model(lmerTest::step(model.Mwt, reduce.random=F))
+summary(model.Mwt.best)
+anova(model.Mwt.best)
+
+# check residuals
+resid.model.Mwt<- resid(model.Mwt.best)
+pred.model.Mwt<- predict(model.Mwt.best)
+
+# check randomness
+plot(pred.model.Mwt, resid.model.Mwt, ylab="Residuals", xlab="Marketable cob weight", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.Mwt, main="Histogram of Residuals", xlab="Marketable cob weight")
+
+qqnorm(resid.model.Mwt) # messy on ends
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.Mwt)
+
+# means
+Mwtemmeans<- emmeans(model.Mwt.best, pairwise ~ Trt_code)
+Mwtemmeans
+plot(Mwtemmeans, comparisons=T) # WF > trts & W (W slightly lower than trts, not signif)
+```
+
+```{r M corn wt analysis -- trts}
+# model analysis for marketable cob weight trts
+model.Mwt.trt<- lmer(M_wt ~ Cult * SR * Location + ( 1 | Rep:Year), data=datr)
+summary(model.Mwt.trt)
+anova(model.Mwt.trt)
+
+model.Mwt.trt.best<- get_model(lmerTest::step(model.Mwt.trt, reduce.random=F))
+summary(model.Mwt.trt.best)
+anova(model.Mwt.trt.best)
+
+# check residuals
+resid.model.Mwttrt<- resid(model.Mwt.trt.best)
+pred.model.Mwttrt<- predict(model.Mwt.trt.best)
+
+# check randomness
+plot(pred.model.Mwttrt, resid.model.Mwttrt, ylab="Residuals", xlab="Marketable cob weight", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.Mwttrt, main="Histogram of Residuals", xlab="Marketable cob weight")
+
+qqnorm(resid.model.Mwttrt) #
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.Mwttrt)
+
+# means
+Mwtemmeans1<- emmeans(model.Mwt.trt.best, pairwise ~ Cult)
+Mwtemmeans1
+plot(Mwtemmeans1, comparisons=T) # Std > Early
+
+Mwtemmeans2<- emmeans(model.Mwt.trt.best, pairwise ~ Location)
+Mwtemmeans2
+plot(Mwtemmeans2, comparison=T) # Harrow > Agassiz & StJean
+```
+
+```{r M corn wt analysis -- w vs wf}
+
+```
+
+
+### Unmarketable corn count
+
+```{r UM corn count}
+# plot of unmarketable cob count by cultivar & seeding rate, separated by location & year
+UMplot1<- ggplot(dat, aes(x = Trt_code, y = UM_count, fill=factor(SR))) +
+          geom_boxplot() +
+          facet_wrap(Location~Year)+
+          theme_bw()
+print(UMplot1)
+```
+
+``` {r UM corn count analysis -- trt vs ctrl}
+# model analysis for unmarketable cob count trt vs ctrl
+model.UM<- lmer(UM_count ~ Trt_code * Location + ( 1 | Rep:Year), data=dat)
+summary(model.UM)
+anova(model.UM)
+
+model.UM.best<- get_model(lmerTest::step(model.UM, reduce.random=F))
+summary(model.UM.best)
+anova(model.UM.best)
+
+# check residuals
+resid.model.UM<- resid(model.UM.best)
+pred.model.UM<- predict(model.UM.best)
+
+# check randomness
+plot(pred.model.UM, resid.model.UM, ylab="Residuals", xlab="Unmarketable cob count", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.UM, main="Histogram of Residuals", xlab="Unmarketable cob count")
+
+qqnorm(resid.model.UM) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.UM)
+
+# means
+UMcountemmeans<- emmeans(model.UM.best, pairwise ~ Trt_code)
+UMcountemmeans
+plot(UMcountemmeans, comparisons=T) # WF > W, S3 > W, Trts = WF
+```
+
+```{r UM corn count analysis -- trts}
+# model analysis for unmarketable cob count trts
+model.UM.trt<- lmer(UM_count ~ Cult * SR * Location + ( 1 | Rep:Year), data=datr)
+summary(model.UM.trt)
+anova(model.UM.trt)
+
+model.UM.trt.best<- get_model(lmerTest::step(model.UM.trt, reduce.random=F))
+summary(model.UM.trt.best)
+anova(model.UM.trt.best)
+
+# check residuals
+resid.model.UMtrt<- resid(model.UM.trt.best)
+pred.model.UMtrt<- predict(model.UM.trt.best)
+
+# check randomness
+plot(pred.model.UMtrt, resid.model.UMtrt, ylab="Residuals", xlab="Unmarketable cob count", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.UMtrt, main="Histogram of Residuals", xlab="Unmarketable cob count")
+
+qqnorm(resid.model.UMtrt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.UMtrt)
+
+# means
+UMcountemmeans1<- emmeans(model.UM.trt.best, pairwise ~ Cult)
+UMcountemmeans1
+plot(UMcountemmeans1, comparisons=T) # Std > Early
+
+UMcountemmeans2<- emmeans(model.UM.trt.best, pairwise ~ Location)
+UMcountemmeans2
+plot(UMcountemmeans2, comparisons=T) # Harrow > Agassiz & StJean
+```
+
+```{r UM corn count analysis -- w vs wf}
+
+```
+
+
+### Unmarketable corn weight
+
+```{r UM corn wt}
+# plot of unmarketable cob weight by cultivar & seeding rate, separated by location & year
+UMwtplot1<- ggplot(dat, aes(x = Trt_code, y = UM_wt, fill=factor(SR))) +
+          geom_boxplot() +
+          facet_wrap(Location~Year)+
+          theme_bw()
+print(UMwtplot1)
+```
+
+```{r UM corn wt analysis -- trt vs ctrl}
+# model analysis for unmarketable cob weight trt vs ctrl
+model.UMwt<- lmer(UM_wt ~ Trt_code * Location + ( 1 | Rep:Year), data=dat)
+summary(model.UMwt)
+anova(model.UMwt)
+
+model.UMwt.best<- get_model(lmerTest::step(model.UMwt, reduce.random=F))
+summary(model.UMwt.best)
+anova(model.UMwt.best)
+
+# check residuals
+resid.model.UMwt<- resid(model.UMwt.best)
+pred.model.UMwt<- predict(model.UMwt.best)
+
+# check randomness
+plot(pred.model.UMwt, resid.model.UMwt, ylab="Residuals", xlab="UnMarketable cob weight", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.UMwt, main="Histogram of Residuals", xlab="UnMarketable cob weight")
+
+qqnorm(resid.model.UMwt)
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.UMwt)
+
+# means
+UMwtemmeans<- emmeans(model.UMwt.best, pairwise ~ Trt_code|Location)
+UMwtemmeans
+plot(UMwtemmeans, comparisons=T) # Agassiz: WF > trts & W, Harrow & StJean all same
+```
+
+```{r UM corn wt analysis -- trts}
+# model analysis for unmarketable cob weight trt vs ctrl
+model.UMwt.trt<- lmer(UM_wt ~ Cult * SR * Location + ( 1 | Rep:Year), data=datr)
+summary(model.UMwt.trt)
+anova(model.UMwt.trt)
+
+model.UMwt.trt.best<- get_model(lmerTest::step(model.UMwt.trt, reduce.random=F))
+summary(model.UMwt.trt.best)
+anova(model.UMwt.trt.best)
+
+# check residuals
+resid.model.UMwttrt<- resid(model.UMwt.trt.best)
+pred.model.UMwttrt<- predict(model.UMwt.trt.best)
+
+# check randomness
+plot(pred.model.UMwttrt, resid.model.UMwttrt, ylab="Residuals", xlab="UnMarketable cob weight", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.UMwttrt, main="Histogram of Residuals", xlab="UnMarketable cob weight")
+
+qqnorm(resid.model.UMwttrt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.UMwttrt)
+
+# means
+UMwtemmeans1<- emmeans(model.UMwt.trt.best, pairwise ~ Location)
+UMwtemmeans1
+plot(UMwtemmeans1, comparisons=T) # Harrow & StJean > Agassiz
+```
+
+```{r UM corn wt analysis -- w vs wf}
+
+```
+
+
+### Corn analysis with W/WF subfactor
+
+```{r}
+datW<- subset(dat, Location=="Harrow" & Year=="2020"|Year=="2021")
+str(datW)
+datW$Weediness
+```
+
+None of these models are working, most say Error: number of rows in use has changed: remove missing values? But there shouldn't be any missing values 
+
+#### Corn stand
+
+```{r}
+# plot of corn stand by cultivar & seeding rate
+wstandplot1<- ggplot(datW, aes(x = Trt_code, y = Corn_stand, fill=factor(Weediness))) +
+          geom_boxplot() +
+          theme_bw()
+print(wstandplot1)
+
+# model analysis for corn stand (count data so glmer used with poisson distribution)
+model.standw<- glmer(Corn_stand ~ Cult * SR * Weediness + ( 1 | Rep), data=datW, family=poisson) # suggests model may be singular
+summary(model.standw)
+Anova(model.standw, type="III")
+
+isSingular(model.standw) # True
+
+model.standw.best<- get_model(lmerTest::step(model.standw, reduce.random=F))
+model.standw.best<- glmer(Corn_stand ~ 1 + (1 | Rep), data=datW, family=poisson)
+summary(model.standw.best)
+Anova(model.standw.best, type="III")
+
+# check residuals
+resid.model.standw<- resid(model.standw.best)
+pred.model.standw<- predict(model.standw.best)
+
+# check randomness
+plot(pred.model.standw, resid.model.standw, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+# very divided
+
+# check normality
+hist(resid.model.standw, main="Histogram of Residuals", xlab="Corn stand")
+# not normal
+
+qqnorm(resid.model.standw) # messy on ends
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.standw)
+# data assumptions not met. data mostly singular
+
+emmeans(model.standw, pairwise ~ Weediness)
+plot(emmeans(model.standw, pairwise ~ Weediness))
+```
+
+#### corn height
+Having issues with lmerTest::step saying change in variable length. Anova of full model indicates Weediness is significant -> weedy plots have taller height
+```{r}
+# plot of average corn height by cultivar & seeding rate
+htplotw<- ggplot(datW, aes(x = Trt_code, y = Corn_ht_av, fill=factor(Weediness))) +
+          geom_boxplot() +
+          theme_bw()
+print(htplotw)
+
+dataW.na.omit<- datW[!is.na(datW$Corn_ht_av),]
+
+# model analysis for average corn height
+model.htw<- lmer(Corn_ht_av ~ Cult * SR * Weediness + ( 1 | Rep), data=dataW.na.omit)
+summary(model.htw)
+anova(model.htw)
+
+model.htw.best<- get_model(lmerTest::step(model.htw, reduce.random=F))
+summary(model.ht.best)
+anova(model.ht.best)
+
+# not working
+
+htwemmeans<- emmeans(model.htw, pairwise ~ Weediness)
+htwemmeans # weedy plots taller by ~ 3cm
+```
+
+#### Marketable corn count
+
+```{r}
+# plot of marketable cob count by cultivar & seeding rate
+Mplotw<- ggplot(datw, aes(x = Trt_code, y = M_count, fill=factor(Weediness))) +
+          geom_boxplot() +
+          theme_bw()
+print(Mplotw)
+
+# model analysis for marketable corn count
+model.Mw<- lmer(M_count ~ Cult * SR * Weediness + ( 1 | Rep), data=datW)
+summary(model.Mw)
+anova(model.Mw)
+
+isSingular(model.Mw) # True
+
+model.Mw.best<- get_model(lmerTest::step(model.Mw, reduce.random=F)) ## Not working -- number of rows in use has changed: remove missing values?
+summary(model.M.best)
+anova(model.M.best)
+
+Mwemmeans<- emmeans(model.Mw, pairwise ~ Weediness)
+Mwemmeans # WF plots have about 4 more marketable cobs than W
+```
+
+#### Marketable corn weight
+
+```{r}
+# plot of marketable cob weight by cultivar & seeding rate
+Mwtplotw<- ggplot(datW, aes(x = Trt_code, y = M_wt, fill=factor(Weediness))) +
+          geom_boxplot() +
+          theme_bw()
+print(Mwtplotw)
+
+# model analysis for marketable cob weight
+model.Mwtw<- lmer(M_wt ~ Cult * SR * Weediness + ( 1 | Rep), data=datW)
+summary(model.Mwtw)
+anova(model.Mwtw)
+
+model.Mwtw.best<- get_model(lmerTest::step(model.Mwtw, reduce.random=F)) # Not working -> number of rows in use has changed
+summary(model.Mwt.best)
+anova(model.Mwt.best)
+
+Mwtwemmeans<- emmeans(model.Mwtw, pairwise ~ Weediness)
+Mwtwemmeans # WF has 1945g more marketable weight than W
+Mwtemmeans2<- emmeans(model.Mwtw, pairwise ~ Cult)
+Mwt.emmeans2
+Mwtemmeans3<- emmeans(model.Mwtw, pairwise ~ Weediness|Cult)
+Mwtemmeans3
+```
+
+#### Unmarketable corn count
+
+```{r}
+# plot of unmarketable cob count by cultivar & seeding rate
+UMplotw<- ggplot(datW, aes(x = Trt_code, y = UM_count, fill=factor(Weediness))) +
+          geom_boxplot() +
+          theme_bw()
+print(UMplotw)
+
+# model analysis for unmarketable cob count
+model.UMw<- lmer(UM_count ~ Cult * SR * Weediness + ( 1 | Rep), data=datW)
+summary(model.UMw)
+anova(model.UMw)
+
+model.UMw.best<- get_model(lmerTest::step(model.UMw, reduce.random=F)) # Not working -> number of rows in use has changed
+summary(model.UMw.best)
+anova(model.UMw.best)
+
+```
+
+#### Unmarketable corn weight
+
+```{r}
+# plot of unmarketable cob weight by cultivar & seeding rate
+UMwtplotw<- ggplot(datW, aes(x = Trt_code, y = UM_wt, fill=factor(Weediness))) +
+          geom_boxplot() +
+          theme_bw()
+print(UMwtplotw)
+
+# model analysis for unmarketable cob weight
+model.UMwtw<- lmer(UM_wt ~ Cult * SR * Weediness + ( 1 | Rep), data=datW)
+summary(model.UMwtw)
+anova(model.UMwtw)
+
+model.UMwtw.best<- get_model(lmerTest::step(model.UMwtw, reduce.random=F)) # Not working -> number of rows in use has changed
+summary(model.UMwtw.best)
+anova(model.UMwtw.best)
+
+```
+
+
+### Weeds
+
+#### Counts
+
+```{r}
+# table with sums of weed counts & standard deviation for within each combination of year, location, cultivar, seeding rate, and time 
+Wtable<-wdat %>%
+  group_by(Year, Location, Cult, SR, Time) %>%
+  summarize(Sum=sum(Count), SD=sd(Count))
+
+Wtable$Time<- factor(Wtable$Time, levels = c("PRE","28DAT","56DAT")) # reorder Time levels so chronological
+
+# plot sum of weed counts & SD from table against seeding rate, factored by cultivar (shape) & time (colour), facted by location & year
+## dodged position for easier reading
+Wplot<- ggplot(Wtable, aes(x=SR, y=Sum, colour=factor(Time), shape=factor(Cult))) +
+  geom_point(position=position_dodge(0.9), size=3) +
+  geom_errorbar(aes(ymin=Sum-SD, ymax=Sum+SD), width=0.2, position=position_dodge(0.9)) +
+  facet_wrap(Location~Year) +
+  theme_bw()
+print(Wplot)
+
+# plot of weed count over time (Pre, 28DAT, 56DAT), factored by Cultivar (point shape) & seeding rate (colour & lines), faceted by location & year
+Wplot2<- ggplot(Wtable, aes(x=Time, y=Sum, colour=factor(SR), shape=factor(Cult), group=interaction(SR, Cult))) +
+  geom_point(size=3) +
+  geom_line() +
+  geom_errorbar(aes(ymin=Sum-SD, ymax=Sum+SD), width=0.2) +
+  facet_wrap(Location~Year) +
+  theme_bw()
+print(Wplot2)
+
+
+
+# weed count models
+## count data so glmer used with poisson distribution
+### since repeated measures, plot added as random effect (not nested or cross classified)
+model.weedcount<- glmer(Count ~ Cult * SR * Location + (1 | Rep : Year) + (1 | Plot), data=wdat, family = poisson)
+summary(model.weedcount)
+Anova(model.weedcount, type="III") # note: different anova test used 
+
+# check residuals
+resid.model.wcount<- resid(model.weedcount)
+pred.model.wcount<- predict(model.weedcount)
+
+# check randomness
+plot(pred.model.wcount, resid.model.wcount, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
+# weird trend
+
+# check normality
+hist(resid.model.wcount, main="Histogram of Residuals", xlab="weed counts")
+# long tails on right
+
+qqnorm(resid.model.wcount) # curvy shape
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.wcount)
+# assumptions not met, needs transformations? Or not using right format of data?
+```
+
+
+#### Biomass
+
+```{r error=T}
+# table with sums of weed biomass for each combination of year, location, cultivar, seeding rate, & plot
+WWsumtable<- subset(wdat, Time=="56DAT") %>%
+  group_by(Year, Location, Cult, SR, Plot) %>%
+  summarize(WSum=sum(Weight))
+# table with mean weed biomass & standard deviation for each combination of year, location, cultivar, & seeding rate (i.e. averaged across reps)
+WWmeantable<- WWsumtable %>%
+  group_by(Year, Location, Cult, SR) %>%
+  summarize(WMean=mean(WSum), WSD=sd(WSum))
+
+WWmeantable$Cult<- factor(WWmeantable$Cult, levels = c("Standard", "Early", "NoRye")) # reorder cultivar levels
+
+WWtable<-subset(wdat, Time=="56DAT") %>%
+  group_by(Year, Location, Cult, SR, Plot, Rep, Trt_num) %>%
+  summarize(W=sum(Weight), Wsd=sd(Weight))
+
+wplot<- ggplot(WWtable, aes(x = SR, y = W, fill = Cult)) + 
+          geom_boxplot() +
+          theme_bw()
+print(wplot)
+
+wplot<- ggplot(WWtable, aes(x = SR, y = W, fill = Cult)) + 
+          geom_boxplot() +
+          facet_wrap(Year~Location) +
+          theme_bw()
+print(wplot)
+
+# plot weed biomass & SD from table of means by cultivar & seeding rate, facetted by location & year
+## added in group=interaction(SR, Cult) as suggested from plotly.com/ggplot2/geom_line/
+### dodged position used for legibility
+WWplot<- ggplot(WWmeantable, aes(x=Cult, y=WMean, colour=factor(SR), group=interaction(SR, Cult))) +
+  geom_point(position=position_dodge(0.9), size=3) +
+  geom_errorbar(aes(ymin=WMean-WSD, ymax=WMean+WSD), width=0.2, position=position_dodge(0.9)) +
+  facet_wrap(Location~Year) + 
+  theme_bw()
+print(WWplot)
+
+
+
+# weed biomass models  
+model.ww<- lmer(Weight ~ Cult * SR * Location + (1 | Rep : Year), data=subset(wdat, Time=="56DAT"))
+summary(model.ww)
+anova(model.ww)
+
+model.ww.best<- get_model(lmerTest::step(model.ww, reduce.random=F))
+### says number of rows in use has changed but theres not missing data so not sure why
+
+# is.na(subset(wdat, Time=="56DAT")$Weight) # all F -> no missing weights data
+## internet suggests to try na.omit but not sure what data it could be taking out 
+
+# wdat.na.omit<- na.omit(wdat)
+## removes all of the data
+
+WWemmeans<- emmeans(model.ww, pairwise ~ Location|Cult)
+
+
+# try weed biomass data without Harrow 2019 data
+datnoH19<- wdat[!(wdat$Location=="Harrow" & wdat$Year=="2019"),]
+
+WWsumtable2<- subset(datnoH19, Time=="56DAT") %>%
+  group_by(Year, Location, Cult, SR, Plot, Trt_num) %>%
+  summarize(WSum2=sum(Weight))
+# table with mean weed biomass & standard deviation for each combination of year, location, cultivar, & seeding rate (i.e. averaged across reps)
+WWmeantable2<- WWsumtable2 %>%
+  group_by(Year, Location, Cult, SR) %>%
+  summarize(WMean2=mean(WSum2), WSD2=sd(WSum2))
+
+WWmeantable2$Cult<- factor(WWmeantable2$Cult, levels = c("Standard", "Elbon", "NoRye")) # reorder cultivar levels
+WWsumtable2$Cult<- factor(WWsumtable2$Cult, levels = c("Standard", "Early", "NoRye")) # reorder cultivar levels
+
+# plot weed biomass & SD from table of means by cultivar & seeding rate, facetted by location & year
+## added in group=interaction(SR, Cult) as suggested from plotly.com/ggplot2/geom_line/
+### dodged position used for legibility
+WWplot2<- ggplot(WWmeantable2, aes(x=Cult, y=WMean2, colour=factor(SR), group=interaction(SR, Cult))) +
+  geom_point(position=position_dodge(0.9), size=3) +
+  geom_errorbar(aes(ymin=WMean2-WSD2, ymax=WMean2+WSD2), width=0.2, position=position_dodge(0.9)) +
+  facet_wrap(Location~Year) + 
+  theme_bw()
+print(WWplot2)
+
+WWplot2<- ggplot(WWsumtable2, aes(x=Trt_num, y=WSum2)) +
+  geom_boxplot() +
+  facet_wrap(~Location) + 
+  theme_bw()
+print(WWplot2)
+
+model.ww2<- lmer(Weight ~ Cult * SR * Location + (1 | Rep : Year), data=subset(datnoH19, Time=="56DAT"))
+summary(model.ww2)
+anova(model.ww2)
+
+model.ww3<- lmer(Weight ~ Location : Cult + Location + Cult + (1 | Rep:Year), data=subset(datnoH19, Time=="56DAT"))
+
+emmeans(model.ww3, pairwise~Cult|Location)
+
+max(WWsumtable2$WSum2)
+WWsumtable3<- subset(WWsumtable2, WSum2<550)
+
+WWplot3<- ggplot(WWsumtable3, aes(x=Trt_num, y=WSum2, fill=Trt_num)) +
+  geom_boxplot() +
+  scale_fill_brewer(palette="OrRd") +
+  labs(x="Cultivar and Seeding Rate (seeds m^-2)",y="Weed biomass (g)")+
+  scale_x_discrete(labels=c("1"="No Rye","2"="Standard 150","3"="Standard 300","4"="Standard 600","5"="Early 150","6"="Early 300","7"="Early 600")) +
+  facet_wrap(~Location) + 
+  theme(
+    axis.text.x=element_text(angle=90),
+    panel.background = element_rect(colour = "black", fill = "white"),
+    panel.grid.major = element_line(colour = "lightgrey"),
+    legend.position = "none",
+    axis.text=element_text(size=14),
+    axis.title=element_text(size=14,face="bold"),
+    strip.text = element_text(size=14), 
+    strip.background = element_rect(fill = "white", colour = "black")
+  )
+print(WWplot3)
+```
+
+Not able to produce a model for weed biomass data... telling me that number of rows in use has changed when I use the step function but there's not missing weight data so not sure why
+
+Can manually perform model reduction but that won't address the underlying problem.
+
+It appears from model.ww that location is the only factor that affects weed biomass.
+
+
+
+
+### Rye 50% anthesis
+
+```{r}
+# plot of rye anthesis for each cultivar & location, separated by year
+anthplot1<- ggplot(dat, aes(x = Cult, y = Rye_anthesis, colour=factor(Location))) +
+  geom_point() +
+  facet_wrap(~Year) +
+  theme_bw()
+print(anthplot1)
+
+# model analysis for rye anthesis
+model.anth<- lmer(Rye_anthesis ~ Cult * SR * Location + ( 1 | Rep:Year), data=dat)
+summary(model.anth)
+anova(model.anth)
+
+model.anth.best<- get_model(lmerTest::step(model.anth, reduce.random=F))
+summary(model.anth.best)
+anova(model.anth.best)
+
+# check residuals
+resid.model.anth<- resid(model.anth.best)
+pred.model.anth<- predict(model.anth.best)
+
+# check randomness
+plot(pred.model.anth, resid.model.anth, ylab="Residuals", xlab="Rye anthesis", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.anth, main="Histogram of Residuals", xlab="Rye anthesis")
+# very weird shape
+
+qqnorm(resid.model.anth) 
+# staggered
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.anth)
+# test assumptions not met
+
+# plot of rye anthesis by SR & Cult for Harrow 2019 only (other locations & years only provided single date per cultivar)
+anthplot2<- ggplot(subset(dat, Location=="Harrow" & Year =="2019"), aes(x = Rye_anthesis, y = SR, fill=factor(Cult))) +
+  geom_boxplot() + 
+  theme_bw()
+print(anthplot2)
+  
+anthemmeans<- emmeans(model.anth.best, pairwise ~ Cult|Location)
+anthemmeans
+plot(anthemmeans, comparisons=T)
+# Elbon 4 days earlier in Agassiz, 5.33 days earlier in Harrow, & the same as standard in StJean
+
+mean(subset(dat, Location=="Harrow" & Year=="2019" & Cult=="Elbon")$Rye_anthesis) # 155
+mean(subset(dat, Location=="Harrow" & Year=="2019" & Cult=="Standard")$Rye_anthesis) # 157
+
+```
+
+
+### Corn VT
+
+```{r}
+# plot of corn VT stage by treatment code, separated by location & year
+vtplot1<- ggplot(dat, aes(x = Trt_code, y = VT_date, fill=factor(Cult))) +
+  geom_boxplot() +
+  facet_wrap(Location~Year) +
+  theme_bw()
+print(vtplot1)
+
+# model analysis for corn VT stage
+model.vt<- lmer(VT_date ~ Cult * SR * Location + ( 1 | Rep:Year), data=dat)
+summary(model.vt)
+anova(model.vt)
+
+isSingular(model.vt) # TRUE -> likely only location needed in model
+
+
+
+model.vt.best<- get_model(lmerTest::step(model.vt, reduce.random=F)) # not working -> number of rows in use has changed
+summary(model.vt.best)
+anova(model.vt.best)
+
+```
+
+
+### Correlation of rye biomass & weed biomass
+
+```{r}
+# need dataframe with rye biomass & weed biomass data
+WWmeantable # table of Year, Location, Cultivar, Seeding rate, Mean weed biomass (across all reps), standard deviation of the mean
+
+# make table of Mean rye biomass (across all reps) for each Year, Location, Cultivar, Seeding rate, + standard deviation of the mean
+RWsumtable<- dat %>%
+  group_by(Year, Location, Cult, SR, Plot) %>%
+  summarize(RSum=sum(Rye_wt))
+
+RWmeantable<- RWsumtable %>%
+  group_by(Year, Location, Cult, SR) %>%
+  summarize(RMean=mean(RSum, na.rm=T), RSD=sd(RSum, na.rm=T))
+
+# combine the two tables
+RWWtable<- merge(WWmeantable, RWmeantable, by=c("Year", "Location","Cult","SR"))
+print(RWWtable)
+
+RWWtable2<- merge(WWsumtable, RWsumtable, by=c("Year","Location","Cult","SR","Plot"))
+
+# correlate rye biomass & weed biomass
+RWWplot1<- ggplot(RWWtable, aes(x = RMean, y = WMean, colour=interaction(SR,Cult))) +
+  geom_point(size=3) +
+  geom_errorbar(aes(ymin=WMean-WSD, ymax=WMean+WSD)) +
+  geom_errorbarh(aes(xmin=RMean-RSD, xmax=RMean+RSD)) +
+  facet_wrap(Location~Year) +
+  theme_bw()
+print(RWWplot1)
+
+RWWplot2<- ggplot(RWWtable2, aes(x = RSum, y = WSum, colour=interaction(SR,Cult))) +
+  geom_point(size=3) +
+  facet_wrap(Location~Year) +
+  theme_bw()
+print(RWWplot2)
+
+RWWplot3<- ggplot(RWWtable2, aes(x = RSum, y = WSum, colour=factor(SR))) +
+  geom_point(size=3) +
+  facet_wrap(Location~Year) +
+  theme_bw()
+print(RWWplot3)
+
+RWWplot4<- ggplot(RWWtable2, aes(x = RSum, y = WSum, colour=factor(Cult))) +
+  geom_point(size=3) +
+  facet_wrap(Location~Year) +
+  theme_bw()
+print(RWWplot4)
+
+ggscatter(RWWtable2, x = "RSum", y = "WSum", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Rye biomass", ylab = "Weed biomass") +
+  facet_wrap(Location~Year)
+# significant negative correlation when data pooled but not consistent amongst years & locations
+
+cor.test(RWWtable2$RSum, RWWtable2$WSum, method="pearson")
+# can I use cor.test to test correlation for each location & year?
+
+```
+
+
+### Correlation of corn biomass & weed biomass
+
+```{r}
+ggscatter(dat, x = "Rye_wt", y = "M_wt", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Rye biomass", ylab = "Marketable corn biomass") +
+  facet_wrap(Location~Year)
+
+ggscatter(dat, x = "Rye_wt", y = "M_wt", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Rye biomass", ylab = "Marketable corn biomass")
+
+cor.test(dat$Rye_wt, dat$M_wt, method="pearson")
+# not a significant correlation between corn biomass & rye biomas
+
+MWsumtable<- dat %>%
+  group_by(Year, Location, Cult, SR, Plot) %>%
+  summarize(MSum=sum(M_wt))
+
+MWWsumtable<- merge(MWsumtable, WWsumtable, by=c("Year","Location","Cult","SR","Plot"))
+
+ggscatter(MWWsumtable, x = "WSum", y = "MSum", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Weed biomass", ylab = "Marketable corn biomass") +
+  facet_wrap(Location~Year)
+# Harrow 2020 has nice negative relationship
+
+ggscatter(MWWsumtable, x = "WSum", y = "MSum", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Weed biomass", ylab = "Marketable corn biomass")
+
+cor.test(MWWsumtable$WSum, MWWsumtable$MSum, method="pearson")
+# not a significant correlation between corn biomass & weed biomass
+
+# correlation between weed biomass & corn biomass, HARROW 2020
+ggscatter(subset(MWWsumtable, Location=="Harrow" & Year == "2020"), x = "WSum", y = "MSum", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Weed biomass", ylab = "Marketable corn biomass")
+
+# correlation between weed biomass & corn biomass, AGASSIZ 2019
+ggscatter(subset(MWWsumtable, Location=="Agassiz" & Year == "2019"), x = "WSum", y = "MSum", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Weed biomass", ylab = "Marketable corn biomass")
+
+SJtest<- subset(MWWsumtable, Location=="StJean")
+cor.test(SJtest$WSum, SJtest$MSum, method="pearson")
+```
+
+
+### Corn biomass by seeding rate
+
+```{r}
+Mtable<- dat %>%
+  group_by(Year, Location, SR, Weediness) %>%
+  summarize(MwtMean=mean(M_wt), MwtSD=sd(M_wt))
+
+ggplot(Mtable, aes(x=SR, y=MwtMean, colour=factor(Weediness))) + 
+  geom_point(size=3, position=position_dodge(0.9)) +
+  geom_errorbar(aes(ymin=MwtMean-MwtSD, ymax=MwtMean+MwtSD), position=position_dodge(0.9)) +
+  facet_wrap(Year~Location) +
+  theme_bw()
+
+```
+
+
+#DIR
+
+## load datasets 
+
+There are two datasets for this analysis -- one containing rye stand & weight, corn injury & yield, etc, & the other containing weed counts, stages, & weights
+
+```{r data, results='hide', message=FALSE, warning=FALSE}
+# first dataset containing rye & corn data
+dir<- read.csv("20DIR_Master.csv")
+dir$Rep<- as.factor(dir$Rep)
+# second dataset containing weeds data
+dirw<- read.csv("DIR_Weeds.csv")
+dirw$Rep<- as.factor(dirw$Rep)
+dirw$Trt_num<- as.factor(dirw$Trt_num)
+
+# load packages
+library(ggplot2, quietly = TRUE)
+library(dplyr, quietly = TRUE)
+library(car, quietly = TRUE)
+library(lme4, quietly = TRUE)
+library(lmerTest, quietly = TRUE)
+library(ggpubr, quietly = TRUE)
+library(lsmeans, quietly = TRUE)
+library(emmeans, quietly = TRUE)
+library(rstatix, quietly = TRUE)
+library(cAIC4, quietly = TRUE)
+```
+
+## analysis
+
+For each variable, a graph was created plotting the variable against rye planting direction & crimping direction (if applicable). This was to get a general sense of the trends in the data & look for any anomalies or potential errors.
+
+From there, a full model was created with rye planting and crimping direction as fixed effects, and rep as a random effect to test whether the treatments were different from the control.
+
+Then, the control was dropped and the model ran again to test the differences between treatments. 
+
+The full model was reduced using the function `lmerTest::step()` which applies a backward model reduction approach using the Satterthwaite degrees of freedom method. This function does **not** work on `glmer()` so those required manual reduction.
+
+The simplified model was resaved as `model.x.best`.
+
+A summary table and anova table of the best model was produced to obtain p-values for each fixed effect. 
+
+Model assumptions were tested using a Shapiro-Wilk Test and by visual inspection of the following diagnostic plots of residuals: Predicted vs Actual Residuals, Histogram of Residuals, and Q-Q Plot. 
+
+If model assumptions were not well met, a note has been added and I will further investigate whether a transformation is needed.
+
+If model assumptions were met, a final graph of the variable plotted with only the significant factors was produced. 
+
+Statistical design is an RCBD with planting & crimping as factorial & weediness as split plot factor. The model is:
+
+Y = $\mu$ + block + trt_plnt + trt_crmp + trt_plnt x trt_crmp + weediness + trt_plnt x trt_crmp x weediness + e
+
+
+### rye stand
+
+```{r rye stand data modifications, results='hide', message=FALSE, warning=FALSE}
+# remove no rye control plots
+dirtrt<- subset(dir, Trt_plnt=="E"|Trt_plnt=="N")
+# create column with total rye stand
+dir$Rye_total_stand<- dir$Rye_back_stand + dir$Rye_front_stand
+```
+
+```{r plot rye stand}
+# front
+ryestandfront<- ggplot(dirtrt, aes(x = Trt_plnt, y = Rye_front_stand)) +
+          geom_boxplot() +
+          theme_bw()
+print(ryestandfront)
+
+# back
+ryestandback<- ggplot(dirtrt, aes(x = Trt_plnt, y = Rye_back_stand)) +
+          geom_boxplot() +
+          theme_bw()
+print(ryestandback)
+
+# total
+ryestandtotal<- ggplot(dirtrt, aes(x = Trt_plnt, y = (Rye_front_stand+Rye_back_stand))) + 
+          geom_boxplot() +
+          theme_bw()
+print(ryestandtotal)
+```
+
+```{r t test rye stand (front vs back)}
+# paired sample t test to determine if front stand different from back stand
+standtest<- t.test(dir$Rye_front_stand, dir$Rye_back_stand, paired = T)
+standtest
+# not significantly different so pool
+```
+
+```{r plot rye stand rep effect, results='hide', message=FALSE, warning=FALSE}
+# front
+ryestandfrontrep<- ggplot(dirtrt, aes(x = Rep, y = Rye_front_stand)) +
+          geom_boxplot() +
+          theme_bw()
+print(ryestandfrontrep)
+
+# back
+ryestandbackrep<- ggplot(dirtrt, aes(x = Rep, y = Rye_back_stand)) +
+          geom_boxplot() +
+          theme_bw()
+print(ryestandbackrep)
+
+# total
+ryestandtotalrep<- ggplot(dirtrt, aes(x = Rep, y = (Rye_front_stand+Rye_back_stand))) +
+          geom_boxplot() +
+          theme_bw()
+print(ryestandtotalrep)
+
+# clear rep effect w/ rep 3 being highest, 1 being lowest
+
+# anova of reps to determine if statistically different
+standrep<- anova_test(Rye_total_stand ~ Rep, data=dirtrt)
+standrep
+# significant 
+```
+
+```{r model rye stand, results='hide', message=FALSE, warning=FALSE}
+# total
+model.stand<- lmer((Rye_front_stand+Rye_back_stand) ~ Trt_plnt + ( 1 | Rep), data=dirtrt)
+summary(model.stand)
+anova(model.stand)
+
+## model reduction
+model.stand.best<- get_model(lmerTest::step(model.stand, reduce.random=F))
+summary(model.stand.best)
+anova(model.stand.best)
+### best model: (Rye_front_stand + Rye_back_stand) ~ (1 | Rep)
+```
+
+```{r rye stand model assumptions, results='hide', message=FALSE, warning=FALSE,}
+# check residuals
+resid.model.stand<- resid(model.stand.best)
+pred.model.stand<- predict(model.stand.best)
+
+# check randomness
+plot(pred.model.stand, resid.model.stand, ylab="Residuals", xlab="Rye Stand", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.stand, main="Histogram of Residuals", xlab="Rye Stand") # a little disrupted
+
+qqnorm(resid.model.stand) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.stand)
+# test assumptions fine
+```
+
+```{r rye stand difference of means, results='hide', message=FALSE, warning=FALSE,}
+# no signficant main effects to compare means
+```
+
+
+### rye biomass
+
+```{r rye biomass data modifications, results='hide', message=FALSE, warning=FALSE}
+# use dirtrt
+```
+
+```{r plot rye biomass}
+ryewt<- ggplot(dirtrt, aes(x = Trt_plnt, y = Rye_wt)) + 
+          geom_boxplot() +
+          theme_bw()
+print(ryewt)
+```
+
+```{r plot rye biomass rep effect, results='hide', message=FALSE, warning=FALSE}
+ryewtrep<- ggplot(dirtrt, aes(x = Rep, y = Rye_wt)) +
+          geom_boxplot() +
+          theme_bw()
+print(ryewtrep)
+
+# clear rep effect w/ rep 3 being highest, 1 being lowest (similar to stand)
+
+# anova of reps to determine if statistically different
+ryewtrep<- anova_test(Rye_wt ~ Rep, data=dirtrt)
+ryewtrep
+# not significant
+```
+
+```{r model rye biomass, results='hide', message=FALSE, warning=FALSE}
+model.ryewt<- lmer(Rye_wt ~ Trt_plnt + ( 1 | Rep), data=dirtrt)
+summary(model.ryewt)
+anova(model.ryewt)
+
+## model reduction
+model.ryewt.best<- get_model(lmerTest::step(model.ryewt, reduce.random=F))
+summary(model.ryewt.best)
+anova(model.ryewt.best)
+### best model: Rye_wt ~ (1 | Rep)
+```
+
+```{r rye biomass model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.ryewt<- resid(model.ryewt.best)
+pred.model.ryewt<- predict(model.ryewt.best)
+
+# check randomness
+plot(pred.model.ryewt, resid.model.ryewt, ylab="Residuals", xlab="Rye biomass", main="Predictecd vs Residuals") # some divide
+
+# check normality
+hist(resid.model.ryewt, main="Histogram of Residuals", xlab="Rye biomass") 
+
+qqnorm(resid.model.ryewt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.ryewt)
+# test assumptions fine
+```
+
+```{r rye biomass difference of means, results='hide', message=FALSE, warning=FALSE}
+# no signficant main effects to compare means
+```
+
+
+### rye pop ups
+
+```{r pop up data modifications, results='hide', message=FALSE, warning=FALSE}
+# use dirtrt
+# convert pop  up data to long form
+dirpop <- dirtrt %>%
+  gather(key = "time", value = "popups", Pop_0DAT,Pop_7DAT,Pop_14DAt,Pop_21DAT,Pop_28DAT) %>%
+  convert_as_factor(Plot, time)
+```
+
+```{r plot rye pop ups}
+ryepop<- ggplot(dirpop, aes(x = time, y = popups)) + 
+          geom_boxplot() +
+          theme_bw()
+print(ryepop)
+# little difference over time after first week
+
+ryepop<- ggplot(dirpop, aes(x = time, y = popups, fill=factor(Trt_plnt))) + 
+          geom_boxplot() +
+          theme_bw()
+print(ryepop)
+# no differences across planting arrangements
+
+ryepop<- ggplot(dirpop, aes(x = time, y = popups, fill=factor(Trt_crmp))) + 
+          geom_boxplot() +
+          theme_bw()
+print(ryepop)
+# slightly better crimp when travelling east, possibly dampens over time
+
+ryepop<- ggplot(dirpop, aes(x = time, y = popups, colour=factor(Trt_plnt), shape=Trt_crmp)) + 
+          geom_point(position=position_dodge(0.9)) +
+          theme_bw()
+print(ryepop)
+# appears to  be differences across crimping directions but not planting directions
+```
+
+```{r plot rye pop up rep effect, results='hide', message=FALSE, warning=FALSE}
+ryepoprep<- ggplot(dirpop, aes(x = Rep, y = popups)) +
+          geom_boxplot() +
+          theme_bw()
+print(ryepoprep)
+# no sign of rep effect
+
+# anova of reps to determine if statistically different
+ryepoprep<- anova_test(popups ~ Rep, data=dirpop)
+ryepoprep
+# not significant
+```
+
+```{r model rye pop ups, results='hide', message=FALSE, warning=FALSE}
+# Note: should PLOT be included as a random effect? i.e. (1 | Rep:Plot) ? saw it in online tutorial: https://m-clark.github.io/docs/mixedModels/anovamixed.html
+model.pop<- lmer(popups ~ Trt_plnt*Trt_crmp*time + ( 1 | Rep), data=dirpop)
+summary(model.pop)
+anova(model.pop)
+
+## model reduction
+model.pop.best<- get_model(lmerTest::step(model.pop, reduce.random=F))
+summary(model.pop.best)
+anova(model.pop.best)
+### best model: popups ~ Trt_crmp + time + (1 | Rep)
+```
+
+```{r rye pop up model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.pop<- resid(model.pop.best)
+pred.model.pop<- predict(model.pop.best)
+
+# check randomness
+plot(pred.model.pop, resid.model.pop, ylab="Residuals", xlab="Rye pop ups", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.pop, main="Histogram of Residuals", xlab="Rye pop  ups") 
+
+qqnorm(resid.model.pop) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.pop)
+# test assumptions not great but acceptable
+```
+
+```{r rye pop ups difference of means}
+popmean1<- emmeans(model.pop.best, pairwise ~ Trt_crmp)
+popmean1
+# 34.5 less pop ups in East crimped than North crimped
+
+popmean2<- emmeans(model.pop.best, pairwise ~ time)
+popmean2
+# pop ups at time 0 different from all other times, all other times not different from each other
+```
+
+
+### rye mortality
+
+```{r mortality data modifications, results='hide', message=FALSE, warning=FALSE}
+# use dirtrt
+# convert mortality data to long form
+dirmort <- dirtrt %>%
+  gather(key = "time", value = "mort", Mort_7DAT,Mort_14DAT,Mort_21DAT,Mort_28DAT) %>%
+  convert_as_factor(Plot, time)
+# arrange mortality time in order
+dirmort$time<- factor(dirmort$time, levels = c("Mort_7DAT","Mort_14DAT","Mort_21DAT","Mort_28DAT")) 
+```
+
+```{r plot rye mortality}
+ryemort<- ggplot(dirmort, aes(x = time, y = mort)) + 
+          geom_boxplot() +
+          theme_bw()
+print(ryemort)
+
+ryemort<- ggplot(dirmort, aes(x = time, y = mort, fill=Trt_plnt)) + 
+          geom_boxplot() + 
+          theme_bw()
+print(ryemort)
+# mortality higher in North planted than East planted but dampens by 21DAT
+
+ryemort<- ggplot(dirmort, aes(x = time, y = mort, fill=Trt_crmp)) + 
+          geom_boxplot() + 
+          theme_bw()
+print(ryemort)
+# mortality higher in East than North 7DAT, then higher in North than East 14DAT, then even at 21 & 28
+
+ryemort<- ggplot(dirmort, aes(x = time, y = mort, fill=factor(Trt_num))) + 
+          geom_boxplot() + 
+          theme_bw()
+print(ryemort)
+# 7DAT: order of decreasing mortality = 3, 4, 5, 6; 14DAT: 4, 5, 6&3
+## 3 = NN, 4 = NE, 5 = EN, 6 = EE 
+# all the same at 21 & 28DAT
+```
+
+```{r plot rye mortality rep effect, results='hide', message=FALSE, warning=FALSE}
+ryemortrep<- ggplot(dirmort, aes(x = Rep, y = mort)) +
+          geom_boxplot() +
+          theme_bw()
+print(ryemortrep)
+
+# no apparent rep effect
+
+# anova of reps to determine if statistically different
+ryemortrep<- anova_test(mort ~ Rep, data=dirmort)
+ryemortrep
+# not significant
+```
+
+```{r model rye mortality, results='hide', message=FALSE, warning=FALSE}
+model.mort<- lmer(mort ~ Trt_plnt*Trt_crmp*time + ( 1 | Rep), data=dirmort)
+summary(model.mort)
+anova(model.mort)
+
+## model reduction
+model.mort.best<- get_model(lmerTest::step(model.mort, reduce.random=F))
+summary(model.mort.best)
+anova(model.mort.best)
+### best model: mort ~ Trt_plnt + time + (1 | Rep)
+```
+
+```{r rye mortality model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.mort<- resid(model.mort.best)
+pred.model.mort<- predict(model.mort.best)
+
+# check randomness
+plot(pred.model.mort, resid.model.mort, ylab="Residuals", xlab="Rye mortality", main="Predictecd vs Residuals") # some divide
+
+# check normality
+hist(resid.model.mort, main="Histogram of Residuals", xlab="Rye mortality") 
+
+qqnorm(resid.model.mort) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.mort)
+# test assumptions not great
+```
+
+```{r rye mortality difference of means}
+mortmean1<- emmeans(model.mort.best, pairwise ~ Trt_plnt)
+mortmean1
+# 4.38% better mortality in North than East planting
+
+mortmean2<- emmeans(model.mort.best, pairwise ~ time)
+mortmean2
+# increasing mortality over timem, all statistically different from each other
+```
+
+
+### corn stand
+
+```{r corn stand data modifications, results='hide', message=FALSE, warning=FALSE,}
+# use dir
+# make long form for weedy/weed-free
+dir2 <- dir %>%
+  gather(key = "weediness", value = "stand", W_Corn_stand,	WF_Corn_stand) %>%
+  convert_as_factor(Plot, weediness)
+
+dir2$Trt_num<- as.factor(dir2$Trt_num)
+
+# remove control for comparing treatments
+dir2trt<- subset(dir2, Trt_plnt=="E"|Trt_plnt=="N")
+```
+
+```{r plot corn stand}
+cstand<- ggplot(dir2, aes(x = weediness, y = stand)) + 
+          geom_boxplot() +
+          theme_bw()
+print(cstand)
+
+cstand<- ggplot(dir2, aes(x = Trt_plnt, y = stand, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(cstand)
+# no apparent planting direction effects
+
+cstand<- ggplot(dir2, aes(x = Trt_crmp, y = stand, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(cstand)
+# no apparent crimpng direction effects
+
+cstand<- ggplot(dir2, aes(x = Trt_num, y = stand)) + 
+          geom_boxplot() +
+          theme_bw()
+print(cstand)
+# no apparent treatment differences
+```
+
+```{r plot corn stand rep effect, results='hide', message=FALSE, warning=FALSE}
+cstandrep<- ggplot(dir2, aes(x = Rep, y = stand)) +
+          geom_boxplot() +
+          theme_bw()
+print(cstandrep)
+
+# no apparent rep effects
+
+# anova of reps to determine if statistically different
+cstandrep<- anova_test(stand ~ Rep, data=dir2)
+cstandrep
+# not significant
+```
+
+```{r model corn stand trt vs control, results='hide', message=FALSE, warning=FALSE}
+# first test if treatments are different from control
+model.cstand1<- lmer(stand ~ Trt_num * weediness + ( 1 | Rep), data=dir2)
+summary(model.cstand1)
+anova(model.cstand1)
+
+## model reduction
+model.cstand1.best<- get_model(lmerTest::step(model.cstand1, reduce.random=F))
+summary(model.cstand1.best)
+anova(model.cstand1.best)
+### best model: stand ~ (1 | Rep)
+
+# no difference between treatments & control
+```
+
+```{r model corn stand trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.cstand2<- lmer(stand ~ Trt_plnt * Trt_crmp * weediness + ( 1 | Rep), data=dir2trt)
+summary(model.cstand2)
+anova(model.cstand2)
+
+## model reduction
+model.cstand2.best<- get_model(lmerTest::step(model.cstand2, reduce.random=F))
+summary(model.cstand2.best)
+anova(model.cstand2.best)
+### best model: stand ~ (1 | Rep)
+
+# no difference between treatments
+```
+
+```{r corn stand model assumptions, results='hide', message=FALSE, warning=FALSE,}
+# check residuals
+resid.model.cstand<- resid(model.cstand2.best)
+pred.model.cstand<- predict(model.cstand2.best)
+
+# check randomness
+plot(pred.model.cstand, resid.model.cstand, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals") # all along same line
+
+# check normality
+hist(resid.model.cstand, main="Histogram of Residuals", xlab="Corn stand") # almost all same frequency
+
+qqnorm(resid.model.cstand) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.cstand)
+# test assumptions not met bc data is singular, no treatment differences
+```
+
+```{r corn stand difference of means, results='hide', message=FALSE, warning=FALSE}
+# no signficant main effects to compare means
+```
+
+
+### corn height
+
+```{r height data modifications, results='hide', message=FALSE, warning=FALSE}
+# use dir
+# make long form for weedy/weed-free
+## NOTE: should find a way to merge this with above dirw so only one dataset with weediness in long form
+dir3 <- dir %>%
+  gather(key = "weediness", value = "height", W_Corn_ht_av,	WF_Corn_ht_av) %>%
+  convert_as_factor(Plot, weediness)
+
+dir3$Trt_num<- as.factor(dir3$Trt_num)
+
+# remove control for comparing treatments
+dir3trt<- subset(dir3, Trt_plnt=="E"|Trt_plnt=="N")
+```
+
+```{r plot corn height}
+height<- ggplot(dir3, aes(x = weediness, y = height)) + 
+          geom_boxplot() +
+          theme_bw()
+print(height)
+# shorter in weedy
+
+height<- ggplot(dir3, aes(x = Trt_plnt, y = height, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(height)
+# no apparent plantind direction effects
+
+height<- ggplot(dir3, aes(x = Trt_crmp, y = height, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(height)
+# no apparent crimpng direction effects
+
+height<- ggplot(dir3, aes(x = Trt_num, y = height)) + 
+          geom_boxplot() +
+          theme_bw()
+print(height)
+# trts 1 & 2 highest -> no c.c. N & E
+
+height<- ggplot(dir3, aes(x = Trt_num, y = height, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(height)
+# weediness only affects control plots so possibly elevating above graph
+```
+
+```{r plot corn height rep effect}
+heightrep<- ggplot(dir3, aes(x = Rep, y = height)) +
+          geom_boxplot() +
+          theme_bw()
+print(heightrep)
+
+# no apparent rep effects
+
+# anova of reps to determine if statistically different
+heightrep<- anova_test(height ~ Rep, data=dir3)
+heightrep
+# not significant
+```
+
+```{r model corn height trt vs control}
+# first test if treatments are different from control
+model.ht1<- lmer(height ~ Trt_num * weediness + ( 1 | Rep), data=dir3)
+summary(model.ht1)
+anova(model.ht1)
+
+## model reduction
+model.ht1.best<- get_model(lmerTest::step(model.ht1, reduce.random=F))
+summary(model.ht1.best)
+anova(model.ht1.best)
+### best model: height ~ Trt_num * weediness + (1 | Rep)
+
+# test means to see if treatments are different from control
+htmean1<- emmeans(model.ht1.best, pairwise ~ Trt_num*weediness)
+htmean1
+# 1 weedy not different from any weedy
+# 1 weed-free not different from any weed-free 
+# 2 weedy not different from any weedy
+# 2 weed-free different from 3 & 6 (NN & EE)
+## control elevating effect of weediness
+
+## probably not significant then? is there a better way to explicitly test this than just looking @ means?
+```
+
+```{r model corn height trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.ht2<- lmer(height ~ Trt_plnt * Trt_crmp * weediness + ( 1 | Rep), data=dir3trt)
+summary(model.ht2)
+anova(model.ht2)
+
+## model reduction
+model.ht2.best<- get_model(lmerTest::step(model.ht2, reduce.random=F))
+summary(model.ht2.best)
+anova(model.ht2.best)
+### best model:  height ~ Trt_plnt + Trt_crmp + (1 | Rep) + Trt_plnt:Trt_crmp
+```
+
+```{r corn height model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.ht<- resid(model.ht2.best)
+pred.model.ht<- predict(model.ht2.best)
+
+# check randomness
+plot(pred.model.ht, resid.model.ht, ylab="Residuals", xlab="Corn height", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.ht, main="Histogram of Residuals", xlab="Corn height")
+
+qqnorm(resid.model.ht) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.ht)
+# test assumptions good
+```
+
+```{r corn height difference of means}
+htmean2<- emmeans(model.ht2.best, pairwise ~ Trt_plnt)
+htmean2
+# not significant
+# corn planted into rye planted East 0.325cm taller than North rye
+
+htmean3<- emmeans(model.ht2.best, pairwise ~ Trt_crmp)
+htmean3
+# not significant
+# East corn planting & crimping 0.425cm taller than North planting & crimping
+
+htmean4<- emmeans(model.ht2.best, pairwise ~ Trt_plnt*Trt_crmp)
+htmean4
+# not significant
+# NE & EN taller than EE & NN -> i.e. perpendicular taller than parallel
+```
+
+
+### corn injury
+
+Need to figure out how to make data in long form for time & weediness
+```{r corn injury data modifications, results='hide', message=FALSE, warning=FALSE}
+```
+
+```{r plot corn injury, results='hide', message=FALSE, warning=FALSE}
+
+```
+
+```{r plot corn injury rep effect, results='hide', message=FALSE, warning=FALSE}
+
+```
+
+```{r model corn injury trt vs control, results='hide', message=FALSE, warning=FALSE}
+
+```
+
+```{r model corn injury trt level, results='hide', message=FALSE, warning=FALSE}
+
+```
+
+```{r corn injury model assumptions, results='hide', message=FALSE, warning=FALSE}
+
+```
+
+```{r corn injury difference of means, results='hide', message=FALSE, warning=FALSE}
+# 
+```
+
+
+### corn tasseling
+
+
+### corn marketable count
+
+```{r marketable count data modifications, results='hide', message=FALSE, warning=FALSE}
+# use dir
+# make long form for weedy/weed-free
+dir4 <- dir %>%
+  gather(key = "weediness", value = "count", W_M_count,	WF_M_count) %>%
+  convert_as_factor(Plot, weediness)
+
+dir4$Trt_num<- as.factor(dir4$Trt_num)
+
+# remove control for comparing treatments
+dir4trt<- subset(dir4, Trt_plnt=="E"|Trt_plnt=="N")
+```
+
+```{r plot corn marketable count}
+mcount<- ggplot(dir4, aes(x = weediness, y = count)) + 
+          geom_boxplot() +
+          theme_bw()
+print(mcount)
+# higher count in weed-free
+
+mcount<- ggplot(dir4, aes(x = Trt_plnt, y = count, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(mcount)
+# no apparent planting direction effects
+
+mcount<- ggplot(dir4, aes(x = Trt_crmp, y = count, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(mcount)
+# no apparent crimpng direction effects
+
+mcount<- ggplot(dir4, aes(x = Trt_num, y = count)) + 
+          geom_boxplot() +
+          theme_bw()
+print(mcount)
+# no apparent treatment differences
+
+mcount<- ggplot(dir4, aes(x = Trt_num, y = count, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(mcount)
+# weed-free higher in all cases, no other trends evident
+```
+
+```{r plot corn marketable yield rep effect, results='hide', message=FALSE, warning=FALSE}
+mcountrep<- ggplot(dir4, aes(x = Rep, y = count)) +
+          geom_boxplot() +
+          theme_bw()
+print(mcountrep)
+# no apparent rep effects
+
+# anova of reps to determine if statistically different
+mcountrep<- anova_test(count ~ Rep, data=dir4)
+mcountrep
+# not significant
+```
+
+```{r model corn marketable count trt vs control}
+# first test if treatments are different from control
+model.mcount1<- lmer(count ~ Trt_num * weediness + ( 1 | Rep), data=dir4)
+summary(model.mcount1)
+anova(model.mcount1)
+
+## model reduction
+model.mcount1.best<- get_model(lmerTest::step(model.mcount1, reduce.random=F))
+summary(model.mcount1.best)
+anova(model.mcount1.best)
+### best model: count ~ Trt_num * weediness + (1 | Rep)
+
+mcountmean1<- emmeans(model.mcount1.best, pairwise ~ Trt_num*weediness)
+mcountmean1
+# weedy control 1 lower than weedy trt5
+# weedy control 2 lower than weedy trt 3, 5, 6
+# weed free ctrl 1 & 2 not diff from wf trts
+
+plot(mcountmean1)
+```
+
+```{r model corn marketable count trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.mcount2<- lmer(count ~ Trt_plnt * Trt_crmp * weediness + ( 1 | Rep), data=dir4trt)
+summary(model.mcount2)
+anova(model.mcount2)
+
+## model reduction
+model.mcount2.best<- get_model(lmerTest::step(model.mcount2, reduce.random=F))
+summary(model.mcount2.best)
+anova(model.mcount2.best)
+### best model: count ~ weediness + (1 | Rep)
+```
+
+```{r corn marketable count model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.mcount<- resid(model.mcount2.best)
+pred.model.mcount<- predict(model.mcount2.best)
+
+# check randomness
+plot(pred.model.mcount, resid.model.mcount, ylab="Residuals", xlab="Corn marketable count", main="Predictecd vs Residuals") # divided in 2
+
+# check normality
+hist(resid.model.mcount, main="Histogram of Residuals", xlab="Corn marketable count") 
+
+qqnorm(resid.model.mcount) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.mcount)
+# test assumptions met
+```
+
+```{r corn marketable count difference of means}
+mcountmean2<- emmeans(model.mcount2.best, pairwise ~ weediness)
+mcountmean2
+# 8.69 more marketable cobs in weed-free than weedy
+```
+
+
+### corn marketable weight
+
+```{r marketable weight data modifications, results='hide', message=FALSE, warning=FALSE}
+# use dir
+# make long form for weedy/weed-free
+dir5 <- dir %>%
+  gather(key = "weediness", value = "weight", W_M_wt,	WF_M_wt) %>%
+  convert_as_factor(Plot, weediness)
+
+dir5$Trt_num<- as.factor(dir5$Trt_num)
+
+# remove control for comparing treatments
+dir5trt<- subset(dir5, Trt_plnt=="E"|Trt_plnt=="N")
+```
+
+```{r plot corn marketable weight}
+mwt<- ggplot(dir5, aes(x = weediness, y = weight)) + 
+          geom_boxplot() +
+          theme_bw()
+print(mwt)
+# higher weight in weed-free
+
+mwt<- ggplot(dir5, aes(x = Trt_plnt, y = weight, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(mwt)
+# no apparent planting direction effects
+
+mwt<- ggplot(dir5, aes(x = Trt_crmp, y = weight, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(mwt)
+# no apparent crimpng direction effects
+
+mwt<- ggplot(dir5, aes(x = Trt_num, y = weight)) + 
+          geom_boxplot() +
+          theme_bw()
+print(mwt)
+# no apparent treatment differences
+
+mwt<- ggplot(dir5, aes(x = Trt_num, y = weight, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(mwt)
+# weed-free higher in all cases, no other trends evident
+```
+
+```{r plot corn marketable weight rep effect, results='hide', message=FALSE, warning=FALSE}
+mwtrep<- ggplot(dir5, aes(x = Rep, y = weight)) +
+          geom_boxplot() +
+          theme_bw()
+print(mwtrep)
+# no apparent rep effects
+
+# anova of reps to determine if statistically different
+mwtrep<- anova_test(weight ~ Rep, data=dir5)
+mwtrep
+# not significant
+```
+
+```{r model corn marketable weight trt vs control}
+# first test if treatments are different from control
+model.mwt1<- lmer(weight ~ Trt_num * weediness + ( 1 | Rep), data=dir5)
+summary(model.mwt1)
+anova(model.mwt1)
+
+## model reduction
+model.mwt1.best<- get_model(lmerTest::step(model.mwt1, reduce.random=F))
+summary(model.mwt1.best)
+anova(model.mwt1.best)
+### best model: weight ~ Trt_num * weediness + (1 | Rep)
+
+mwtmean1<- emmeans(model.mwt1.best, pairwise ~ Trt_num*weediness)
+mwtmean1
+# weedy control 1 lower than weedy trt5
+# weedy control 2 lower than weedy trt 3, 5, 6
+# weed free ctrl 1 & 2 higher than all other wf trts
+
+plot(mwtmean1)
+# seems to be measurable affect of rye cover crop
+## evident by difference in weed-free yield
+### also East-planted corn did worse in weedy than North
+```
+
+```{r model corn marketable weight trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.mwt2<- lmer(weight ~ Trt_plnt * Trt_crmp * weediness + ( 1 | Rep), data=dir5trt)
+summary(model.mwt2)
+anova(model.mwt2)
+
+## model reduction
+model.mwt2.best<- get_model(lmerTest::step(model.mwt2, reduce.random=F))
+summary(model.mwt2.best)
+anova(model.mwt2.best)
+### best model: weight ~ weediness + (1 | Rep)
+```
+
+```{r corn marketable weight model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.mwt<- resid(model.mwt2.best)
+pred.model.mwt<- predict(model.mwt2.best)
+
+# check randomness
+plot(pred.model.mwt, resid.model.mwt, ylab="Residuals", xlab="Corn marketable weight", main="Predictecd vs Residuals") # divided in 2
+
+# check normality
+hist(resid.model.mwt, main="Histogram of Residuals", xlab="Corn marketable weight") 
+
+qqnorm(resid.model.mwt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.mwt)
+# test assumptions met
+```
+
+```{r corn marketable weight difference of means}
+mwtmean2<- emmeans(model.mwt2.best, pairwise ~ weediness)
+mwtmean2
+# 2.13 more marketable weight in weed-free than weedy
+```
+
+
+### corn unmarketable count
+
+```{r unmarketable count data modifications, results='hide', message=FALSE, warning=FALSE}
+# use dir
+# make long form for weedy/weed-free
+dir6 <- dir %>%
+  gather(key = "weediness", value = "count", W_UM_count,	WF_UM_count) %>%
+  convert_as_factor(Plot, weediness)
+
+dir6$Trt_num<- as.factor(dir6$Trt_num)
+
+# remove control for comparing treatments
+dir6trt<- subset(dir6, Trt_plnt=="E"|Trt_plnt=="N")
+```
+
+```{r plot corn unmarketable count}
+umcount<- ggplot(dir6, aes(x = weediness, y = count)) + 
+          geom_boxplot() +
+          theme_bw()
+print(umcount)
+# higher count in weed-free
+
+umcount<- ggplot(dir6, aes(x = Trt_plnt, y = count, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(umcount)
+# no apparent planting direction effects
+
+umcount<- ggplot(dir6, aes(x = Trt_crmp, y = count, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(umcount)
+# no apparent crimpng direction effects
+
+umcount<- ggplot(dir6, aes(x = Trt_num, y = count)) + 
+          geom_boxplot() +
+          theme_bw()
+print(umcount)
+# no apparent treatment differences
+
+umcount<- ggplot(dir6, aes(x = Trt_num, y = count, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(umcount)
+# weed-free higher in controls but not in trts, lower in wf trts than wf ctrls, lower in w ctrls than w trts
+# might be evidence of later maturity in cover crop
+```
+
+```{r plot corn unmarketable count rep effect, results='hide', message=FALSE, warning=FALSE}
+umcountrep<- ggplot(dir6, aes(x = Rep, y = count)) +
+          geom_boxplot() +
+          theme_bw()
+print(umcountrep)
+# no apparent rep effects
+
+# anova of reps to determine if statistically different
+umcountrep<- anova_test(count ~ Rep, data=dir6)
+umcountrep
+# not significant
+```
+
+```{r model corn unmarketable count trt vs control}
+# first test if treatments are different from control
+model.umcount1<- lmer(count ~ Trt_num * weediness + ( 1 | Rep), data=dir6)
+summary(model.umcount1)
+anova(model.umcount1)
+
+## model reduction
+model.umcount1.best<- get_model(lmerTest::step(model.umcount1, reduce.random=F))
+summary(model.umcount1.best)
+anova(model.umcount1.best)
+### best model: count ~ Trt_num * weediness + (1 | Rep)
+
+umcountmean1<- emmeans(model.umcount1.best, pairwise ~ Trt_num*weediness)
+umcountmean1
+# weedy & wf ctrls not diff from weedy & wf trts
+# highest weedy means in 3, 4, 6
+# highest wf means in 1, 2, 3
+
+plot(umcountmean1)
+```
+
+```{r model corn unmarketable count trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.umcount2<- lmer(count ~ Trt_plnt * Trt_crmp * weediness + ( 1 | Rep), data=dir6trt)
+summary(model.umcount2)
+anova(model.umcount2)
+
+## model reduction
+model.umcount2.best<- get_model(lmerTest::step(model.umcount2, reduce.random=F))
+summary(model.umcount2.best)
+anova(model.umcount2.best)
+### best model: count ~ (1 | Rep)
+```
+
+```{r corn unmarketable count model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.umcount<- resid(model.umcount2.best)
+pred.model.umcount<- predict(model.umcount2.best)
+
+# check randomness
+plot(pred.model.umcount, resid.model.umcount, ylab="Residuals", xlab="Corn unmarketable count", main="Predictecd vs Residuals") 
+
+# check normality
+hist(resid.model.umcount, main="Histogram of Residuals", xlab="Corn unmarketable count") 
+
+qqnorm(resid.model.umcount) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.umcount)
+# test assumptions met
+```
+
+```{r corn unmarketable count difference of means}
+# no main effects
+```
+
+
+### corn unmarketable weight
+
+```{r unmarketable weight data modifications, results='hide', message=FALSE, warning=FALSE}
+# use dir
+# make long form for weedy/weed-free
+dir7 <- dir %>%
+  gather(key = "weediness", value = "weight", W_UM_wt,	WF_UM_wt) %>%
+  convert_as_factor(Plot, weediness)
+
+dir7$Trt_num<- as.factor(dir7$Trt_num)
+
+# remove control for comparing treatments
+dir7trt<- subset(dir7, Trt_plnt=="E"|Trt_plnt=="N")
+```
+
+```{r plot corn unmarketable weight}
+umwt<- ggplot(dir7, aes(x = weediness, y = weight)) + 
+          geom_boxplot() +
+          theme_bw()
+print(umwt)
+# higher weight in weed-free
+
+umwt<- ggplot(dir7, aes(x = Trt_plnt, y = weight, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(umwt)
+# slightly higher in north rye planted?
+
+umwt<- ggplot(dir7, aes(x = Trt_crmp, y = weight, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(umwt)
+# no apparent crimpng direction effects
+
+umwt<- ggplot(dir7, aes(x = Trt_num, y = weight)) + 
+          geom_boxplot() +
+          theme_bw()
+print(umwt)
+# no apparent treatment differences
+
+umwt<- ggplot(dir7, aes(x = Trt_num, y = weight, fill=weediness)) + 
+          geom_boxplot() +
+          theme_bw()
+print(umwt)
+# weed-free higher in most cases, more in wf ctrls than wf trts, more in w trts than w ctrls
+```
+
+```{r plot corn unmarketable weight rep effect, results='hide', message=FALSE, warning=FALSE}
+umwtrep<- ggplot(dir7, aes(x = Rep, y = weight)) +
+          geom_boxplot() +
+          theme_bw()
+print(umwtrep)
+# no apparent rep effects
+
+# anova of reps to determine if statistically different
+umwtrep<- anova_test(weight ~ Rep, data=dir7)
+umwtrep
+# not significant
+```
+
+```{r model corn unmarketable weight trt vs control}
+# first test if treatments are different from control
+model.umwt1<- lmer(weight ~ Trt_num * weediness + ( 1 | Rep), data=dir7)
+summary(model.umwt1)
+anova(model.umwt1)
+
+## model reduction
+model.umwt1.best<- get_model(lmerTest::step(model.umwt1, reduce.random=F))
+summary(model.umwt1.best)
+anova(model.umwt1.best)
+### best model: weight ~ Trt_num * weediness + (1 | Rep)
+
+umwtmean1<- emmeans(model.umwt1.best, pairwise ~ Trt_num*weediness)
+umwtmean1
+# weedy ctrl 1 lower than weedy trt 4
+# weedy ctrl 2 not diff from weedy trts
+# wf ctrls not diff from wf trts
+
+plot(umwtmean1)
+# trend almost reverses for wf vs weedy
+```
+
+```{r model corn unmarketable weight trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.umwt2<- lmer(weight ~ Trt_plnt * Trt_crmp * weediness + ( 1 | Rep), data=dir7trt)
+summary(model.umwt2)
+anova(model.umwt2)
+
+## model reduction
+model.umwt2.best<- get_model(lmerTest::step(model.umwt2, reduce.random=F))
+summary(model.umwt2.best)
+anova(model.umwt2.best)
+### best model: weight ~ Trt_plnt + (1 | Rep)
+```
+
+```{r corn unmarketable weight model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.umwt<- resid(model.umwt2.best)
+pred.model.umwt<- predict(model.umwt2.best)
+
+# check randomness
+plot(pred.model.umwt, resid.model.umwt, ylab="Residuals", xlab="Corn unmarketable weight", main="Predictecd vs Residuals") # divided in 2
+
+# check normality
+hist(resid.model.umwt, main="Histogram of Residuals", xlab="Corn unmarketable weight") # not normal 
+
+qqnorm(resid.model.umwt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.umwt)
+# test assumptions mostly met
+```
+
+```{r corn unmarketable weight difference of means}
+umwtmean2<- emmeans(model.umwt2.best, pairwise ~ Trt_plnt)
+umwtmean2
+# 0.278kg more unmarketable weight in North planted rye than East
+# no idea why that would be...
+```
+
+
+### total weed count
+
+```{r weed count data modifications, results='hide', message=FALSE, warning=FALSE}
+# table with sums of weed counts & standard deviation for within each combination of rye planting direction, rye crimping/corn planting direction, and time 
+wtab<-dirw %>%
+  group_by(Plot, Rep, Trt_num, Trt_plnt, Trt_crmp, Time) %>%
+  summarize(CountSum=sum(Count), SD=sd(Count))
+
+wtab$Time<- factor(wtab$Time, levels = c("PRE","28DAT","56DAT")) # reorder Time levels so chronological
+
+wtab<- wtab[-73,] # weird row at end containing NAs -> need to find source
+
+wtabtrt<- subset(wtab, Trt_plnt=="E"|Trt_plnt=="N")
+```
+
+```{r plot weed counts}
+weed<- ggplot(wtab, aes(x = Trt_plnt, y = CountSum)) + 
+          geom_boxplot() +
+          theme_bw()
+print(weed)
+
+weed<- ggplot(wtab, aes(x = Trt_crmp, y = CountSum)) + 
+          geom_boxplot() +
+          theme_bw()
+print(weed)
+
+weed<- ggplot(wtab, aes(x = Trt_plnt, y = CountSum, fill = Trt_crmp)) + 
+          geom_boxplot() +
+          theme_bw()
+print(weed)
+
+weed<- ggplot(wtab, aes(x = Time, y = CountSum, fill = Trt_plnt)) + 
+          geom_boxplot() +
+          theme_bw()
+print(weed)
+
+weed<- ggplot(wtab, aes(x = Time, y = CountSum, fill = Trt_crmp)) + 
+          geom_boxplot() +
+          theme_bw()
+print(weed)
+
+weed<- ggplot(wtab, aes(x = Time, y = CountSum, fill = Trt_num)) + 
+          geom_boxplot() +
+          theme_bw()
+print(weed)
+# no apparent treatment effects at any time, but all lower & less variation than ctrls
+```
+
+```{r plot weed count rep effect, results='hide', message=FALSE, warning=FALSE}
+weedrep<- ggplot(wtab, aes(x = Rep, y = CountSum)) +
+          geom_boxplot() +
+          theme_bw()
+print(weedrep)
+# no apparent rep effects
+
+# anova of reps to determine if statistically different
+# weedrep<- anova_test(CountSum ~ Rep, data=wtab) 
+# not working for some reason
+# weedrep
+# 
+```
+
+```{r model weed count trt vs control}
+# first test if treatments are different from control
+model.wcount1<- glmer(CountSum ~ Trt_num * Time + ( 1 | Rep) + (1 | Plot), data=wtab, family=poisson)
+summary(model.wcount1)
+Anova(model.wcount1, type="III")
+
+wcountmean1<- emmeans(model.wcount1, pairwise ~ Trt_num * Time)
+wcountmean1
+# diffs btwn ctrls & trts PRE
+# no diffs btwn ctrls & trts 28DAT & 56DAT
+
+plot(wcountmean1)
+```
+
+```{r model weed count trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.wcount2<- glmer(CountSum ~ Trt_plnt * Trt_crmp * Time + ( 1 | Rep) + (1 | Plot), data=wtabtrt, family=poisson)
+summary(model.wcount2) # AIC = 432.8
+Anova(model.wcount2, type="III")
+
+# model reduction
+step<- stepcAIC(model.wcount2, data=wtabtrt, trace=T, direction="backward", returnResult=T)
+
+# best model: CountSum ~ Trt_plnt + Trt_crmp + Time + (1 | Plot) + (1 | Rep)
+
+model.wcount2.best<- glmer(CountSum ~ Trt_plnt + Trt_crmp + Time + (1 | Plot) + (1 | Rep), data=wtabtrt, family=poisson)
+```
+
+```{r weed count model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.wcount<- resid(model.wcount2.best)
+pred.model.wcount<- predict(model.wcount2.best)
+
+# check randomness
+plot(pred.model.wcount, resid.model.wcount, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.wcount, main="Histogram of Residuals", xlab="Weed counts") # not quite normal but no patterned skewness
+
+qqnorm(resid.model.wcount) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.wcount)
+# test assumptions mostly met
+```
+
+```{r weed count difference of means}
+wcountmean2<- emmeans(model.wcount2.best, pairwise ~ Trt_plnt)
+wcountmean2
+
+wcountmean3<- emmeans(model.wcount2.best, pairwise ~ Trt_crmp)
+wcountmean3
+
+wcountmean4<- emmeans(model.wcount2.best, pairwise ~ Time)
+wcountmean4
+plot(wcountmean4)
+# weed counts low 28DAT
+```
+
+
+### total weed biomass
+
+```{r weed weight data modifications, results='hide', message=FALSE, warning=FALSE}
+# table with sums of weed counts & standard deviation for within each combination of rye planting direction, rye crimping/corn planting direction, and time 
+wtab2<-subset(dirw, Time=="56DAT") %>%
+  group_by(Plot, Rep, Trt_num, Trt_plnt, Trt_crmp) %>%
+  summarize(WeightSum=sum(Weight), WSD=sd(Weight))
+
+wtab2trt<- subset(wtab2, Trt_plnt=="E"|Trt_plnt=="N")
+```
+
+```{r plot weed weights}
+weedw<- ggplot(wtab2, aes(x = Trt_plnt, y = WeightSum)) + 
+          geom_boxplot() +
+          theme_bw()
+print(weedw)
+
+weedw<- ggplot(wtab2, aes(x = Trt_crmp, y = WeightSum)) + 
+          geom_boxplot() +
+          theme_bw()
+print(weedw)
+
+weedw<- ggplot(wtab2, aes(x = Trt_plnt, y = WeightSum, fill = Trt_crmp)) + 
+          geom_boxplot() +
+          theme_bw()
+print(weedw)
+# No apparent benefit to perpendicular crimping -- appears almost worse?
+```
+
+```{r plot weed weight rep effect, results='hide', message=FALSE, warning=FALSE}
+weedwrep<- ggplot(wtab2, aes(x = Rep, y = WeightSum)) +
+          geom_boxplot() +
+          theme_bw()
+print(weedwrep)
+# no apparent rep effects
+
+# anova of reps to determine if statistically different
+# weedwrep<- anova_test(CountSum ~ Rep, data=wtab2) # not working for some reason
+# weedwrep
+# 
+```
+
+```{r model weed weight trt vs control}
+# first test if treatments are different from control
+model.wwt1<- lmer(WeightSum ~ Trt_num + ( 1 | Rep), data=wtab2)
+summary(model.wwt1)
+anova(model.wwt1)
+
+wwtmean1<- emmeans(model.wwt1, pairwise ~ Trt_num)
+wwtmean1
+# ctrl 1 & 2 diff from all trts
+# no trts diff from each other
+
+plot(wwtmean1)
+```
+
+```{r model weed weight trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.wwt2<- lmer(WeightSum ~ Trt_plnt * Trt_crmp + ( 1 | Rep), data=wtab2trt)
+summary(model.wwt2)
+anova(model.wwt2)
+
+isSingular(model.wwt2)
+
+## model reduction
+model.wwt2.best<- get_model(lmerTest::step(model.wwt2, reduce.random=F))
+summary(model.wwt2.best)
+anova(model.wwt2.best)
+### best model: WeightSum ~ (1 | Rep)
+```
+
+```{r weed weight model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.wwt<- resid(model.wwt2.best)
+pred.model.wwt<- predict(model.wwt2.best)
+
+# check randomness
+plot(pred.model.wwt, resid.model.wwt, ylab="Residuals", xlab="Weed weights", main="Predictecd vs Residuals") # all in line
+
+# check normality
+hist(resid.model.wwt, main="Histogram of Residuals", xlab="Weed weights") # almost all same value
+
+qqnorm(resid.model.wwt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.wwt)
+# test assumptions not met but no trends
+```
+
+```{r weed weight difference of means}
+# no main effects
+```
+
+
+### correlation btwn rye biomass & weed biomass
+
+```{r}
+# need dataframe with rye biomass & weed biomass data
+wtab2 # table of weed biomass
+
+# make rye weight data into table
+rtab<- dir %>%
+  group_by(Plot, Rep, Trt_num, Trt_plnt, Trt_crmp) %>%
+  summarize(Rye_wt)
+
+# combine the two tables
+rwtab<- merge(wtab2, rtab, by=c("Plot", "Rep", "Trt_num", "Trt_plnt", "Trt_crmp"))
+print(rwtab)
+
+# correlate rye biomass & weed biomass
+rwplot<- ggplot(rwtab, aes(x = Rye_wt, y = WeightSum, colour=interaction(Trt_plnt,Trt_crmp))) +
+  geom_point(size=3) +
+  theme_bw()
+print(rwplot)
+
+rwplot<- ggplot(rwtab, aes(x = Rye_wt, y = WeightSum, colour=Trt_plnt)) +
+  geom_point(size=3) +
+  theme_bw()
+print(rwplot)
+
+rwplot<- ggplot(rwtab, aes(x = Rye_wt, y = WeightSum, colour=Trt_crmp)) +
+  geom_point(size=3) +
+  theme_bw()
+print(rwplot)
+
+ggscatter(rwtab, x = "Rye_wt", y = "WeightSum", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Rye biomass", ylab = "Weed biomass")
+# weakly negative, not significant
+
+cor.test(rwtab$Rye_wt, rwtab$WeightSum, method="pearson")
+```
+
+
+### correlation btwn marketable corn biomass & weed biomass
+
+```{r}
+mtab<- dir %>%
+  group_by(Plot, Rep, Trt_num, Trt_plnt, Trt_crmp) %>%
+  summarize(W_M_wt)
+
+mwtab<- merge(mtab, wtab2, by=c("Plot", "Rep", "Trt_num", "Trt_plnt", "Trt_crmp"))
+
+ggscatter(mwtab, x = "WeightSum", y = "W_M_wt", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Weed biomass", ylab = "Marketable corn biomass") 
+# strongly correlated 
+
+cor.test(mwtab$WeightSum, mwtab$W_M_wt, method="pearson")
+# R = -0.8, p = 2.35e-6
+```
+
+
+### comparison of broadleaf & grassy weeds
+
+```{r weed type data modifications, results='hide', message=FALSE, warning=FALSE}
+typetab<- dirw %>%
+  group_by(Plot, Rep, Trt_num, Trt_plnt, Trt_crmp, Time, Type) %>%
+  summarize(typeCount=sum(Count))
+
+typetab2<- subset(dirw, Time=="56DAT") %>%
+  group_by(Plot, Rep, Trt_num, Trt_plnt, Trt_crmp, Type) %>%
+  summarize(typeWeight=sum(Weight))
+```
+
+```{r plot weed types -- counts}
+type<- ggplot(typetab, aes(x = Trt_plnt, y = typeCount, fill = Type)) + 
+          geom_boxplot() +
+          theme_bw()
+print(type)
+# grasses larger in all rye planting directions & ctrl
+
+type<- ggplot(typetab, aes(x = Trt_crmp, y = typeCount, fill = Type)) + 
+          geom_boxplot() +
+          theme_bw()
+print(type)
+# grasses larger in all crimping directions
+
+type<- ggplot(typetab, aes(x = Trt_num, y = typeCount, fill = Type)) + 
+          geom_boxplot() +
+          theme_bw()
+print(type)
+# grasses larger in all treatments & controls
+
+type<- ggplot(typetab, aes(x = Time, y = typeCount, fill = Type)) + 
+          geom_boxplot() +
+          theme_bw()
+print(type)
+# grasses larger at all time periods
+```
+
+```{r plot weed type rep effect -- counts, results='hide', message=FALSE, warning=FALSE}
+typerep<- ggplot(typetab, aes(x = Rep, y = typeCount)) +
+          geom_boxplot() +
+          theme_bw()
+print(typerep)
+# no apparent rep effects
+
+# anova of reps to determine if statistically different
+# typerep<- anova_test(typeCount ~ Rep, data=typetab) # not working for some reason
+# typerep
+# 
+```
+
+```{r plot weed types -- weight}
+typew<- ggplot(typetab2, aes(x = Trt_plnt, y = typeWeight, fill = Type)) + 
+          geom_boxplot() +
+          theme_bw()
+print(typew)
+# grasses larger in all rye planting directions & ctrl
+
+typew<- ggplot(typetab2, aes(x = Trt_crmp, y = typeWeight, fill = Type)) + 
+          geom_boxplot() +
+          theme_bw()
+print(typew)
+# grasses larger in all crimping directions
+
+typew<- ggplot(typetab2, aes(x = Trt_num, y = typeWeight, fill = Type)) + 
+          geom_boxplot() +
+          theme_bw()
+print(typew)
+# grasses larger in all treatments & controls
+```
+
+```{r plot weed type rep effect -- weight, results='hide', message=FALSE, warning=FALSE}
+typewrep<- ggplot(typetab2, aes(x = Rep, y = typeWeight)) +
+          geom_boxplot() +
+          theme_bw()
+print(typewrep)
+# no apparent rep effects
+
+# anova of reps to determine if statistically different
+# typewrep<- anova_test(typeWeight ~ Rep, data=typetab2) # not working for some reason
+# typewrep
+# 
+```

@@ -38,6 +38,9 @@ dat$SR<- as.factor(dat$SR)
 dat$VT_date<- as.Date(dat$VT_date, "%Y-%m-%d")
 dat$VT_date<- format(dat$VT_date, "%j")
 dat$VT_date<- as.integer(dat$VT_date, "%j")
+dat$anthesis<- as.Date(dat$anthesis, "%Y-%m-%d")
+dat$anthesis<- format(dat$anthesis, "%j")
+dat$anthesis<- as.integer(dat$anthesis, "%j")
 
 dat<- subset(dat, Nitro=="1") # remove 2N trt
 dattrt<- subset(dat, !is.na(dat$Cult)) # dattrt contains only trt plots (no ctrls)
@@ -151,17 +154,17 @@ Y = $\mu$ + block + cult * SR * Location + (1 | Rep : Year) + e
 ### Rye biomass
 
 ```{r rye biomass}
-datw$Rye_wt
+datwtrt$Rye_wt
 
 # plot of rye biomass by cultivar & seeding rate, separated by location & year
-ryewtplot1<- ggplot(subset(datw, Cult=="Standard"|Cult=="Early"), aes(x = SR, y = Rye_wt, fill=Cult)) +
+ryewtplot1<- ggplot(subset(datwtrt, Cult=="Standard"|Cult=="Early"), aes(x = SR, y = Rye_wt, fill=Cult)) +
           geom_boxplot() +
           facet_wrap(Year~Location)+
           theme_bw()
 print(ryewtplot1)
 
 # model analysis for rye biomass
-model.ryewt<- lmer(Rye_wt ~ Cult * SR * Location + ( 1 | Rep:Year), data=datw)
+model.ryewt<- lmer(Rye_wt ~ Cult * SR * Location + ( 1 | Rep:Year), data=datwtrt)
 summary(model.ryewt)
 anova(model.ryewt)
 
@@ -199,10 +202,10 @@ plot(ryewtemmeans2, comparisons=T)
 ### Rye tillers
 
 ```{r rye tillers}
-datw$TAv
+datwtrt$TAv
 
 # plot of rye tillers by cultivar & seeding rate, separated by location & year
-tillplot1<- ggplot(subset(datw, Cult=="Standard"|Cult=="Early"), aes(x = Cult, y = TAv, fill=factor(SR))) +
+tillplot1<- ggplot(subset(datwtrt, Cult=="Standard"|Cult=="Early"), aes(x = Cult, y = TAv, fill=factor(SR))) +
           geom_boxplot() +
           facet_wrap(Year~Location)+
           theme_bw()
@@ -210,7 +213,7 @@ print(tillplot1)
 # huge outlier -- St Jean 2019 plot 307 (TAv = 14.333)
 
 # model analysis for rye tillering
-model.till<- lmer(TAv ~ Cult * SR * Location + ( 1 | Rep:Year), data=datw)
+model.till<- lmer(TAv ~ Cult * SR * Location + ( 1 | Rep:Year), data=datwtrt)
 summary(model.till)
 anova(model.till)
 
@@ -238,8 +241,8 @@ shapiro.test(resid.model.till)
 
 ## hard-removing outlier as quick fix, saving under different dataframe
 ### large datpoint at StJean 2019 307 TAv=14
-max(datw$TAv, na.rm=T)
-Toutlier.rm<- datw[-c(grep("14", datw$TAv)),]
+max(datwtrt$TAv, na.rm=T)
+Toutlier.rm<- datwtrt[-c(grep("14", datwtrt$TAv)),]
 # check that data point doesn't exist in new dataset
 grep("14", Toutlier.rm$TAv)
 
@@ -291,10 +294,10 @@ plot(tillemmeans2, comparisons=T)
 ### Rye stem diameter
 
 ```{r rye stem diam}
-datw$DiamAv
+datwtrt$DiamAv
 
 # plot of rye stem diameter by cultivar & seeding rate, separated by year, Harrow only
-diamdat<- subset(datw, Location=="Harrow") # subset data to only include Harrow b/c diameter only measured in Harrow
+diamdat<- subset(datwtrt, Location=="Harrow") # subset data to only include Harrow b/c diameter only measured in Harrow
 diamplot1<- ggplot(subset(diamdat, Cult=="Standard"|Cult=="Early"), aes(x = Cult, y = DiamAv, fill=factor(SR))) +
           geom_boxplot() +
           facet_wrap(~Year, ncol=1)+
@@ -333,6 +336,52 @@ plot(diamemmeans1, comparisons=T)
 diamemmeans2<- emmeans(model.diam.best, pairwise ~ SR)
 diamemmeans2
 plot(diamemmeans2, comparisons=T)
+```
+
+
+### Rye anthesis
+```{r rye anthesis}
+datwtrt$anthesis
+
+anthplot1<- ggplot(datwtrt, aes(x = Cult, y = anthesis, colour=factor(Location))) +
+          geom_point() +
+          facet_wrap(~Year)+
+          theme_bw()
+print(anthplot1)
+
+# model analysis for rye stem diameter
+model.anth<- lmer(anthesis ~ Cult * Location + ( 1 | Rep:Year), data=datwtrt)
+summary(model.anth)
+anova(model.anth)
+
+model.anth.best<- get_model(lmerTest::step(model.anth, reduce.random=F))
+summary(model.anth.best)
+anova(model.anth.best)
+
+# check residuals
+resid.model.anth<- resid(model.anth.best)
+pred.model.anth<- predict(model.anth.best)
+
+# check randomness
+plot(pred.model.anth, resid.model.anth, ylab="Residuals", xlab="Rye stem diameter", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.anth, main="Histogram of Residuals", xlab="Rye stem diameter")
+
+qqnorm(resid.model.anth) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.anth)
+
+anthemmeans1<- emmeans(model.anth.best, pairwise ~ Cult*Location)
+anthemmeans1
+plot(anthemmeans1, comparisons=T)
+```
+
+
+### Corn VT stage
+```{r corn VT stage}
+datw$VT_date
 ```
 
 

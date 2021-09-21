@@ -99,7 +99,7 @@ datwftrt2<- rbind(Hdatwftrt2, Sdatwftrt2)
 
 
 
-wdat<- read.csv("VAR_Weeds.csv")
+wdat<- read.csv("VAR_Weeds_Reduced.csv")
 str(wdat) # view data variables & adjust type as necessary
 wdat$Plot<- as.factor(wdat$Plot)
 wdat$Rep<- as.factor(wdat$Rep)
@@ -147,13 +147,13 @@ The process of model reduction, assumption testing, & means comparisons was repe
 
 Statistical design is an incomplete RBD with cultivar & seeding rate as factorial, weedy & weed-free no rye plots, & weed-free rye plots for some treatments at some locations. The model is:
 
-Y = $\mu$ + block + cult * SR * Location + (1 | Rep : Year) + e
+Y = $\mu$ + block + cult * SR + (1 | Year / Rep) + (1 | Location / Rep) + e
 
 
 
 ### Rye biomass
 
-```{r rye biomass}
+```{r rye biomass graphs}
 datwtrt$Rye_wt
 
 # plot of rye biomass by cultivar & seeding rate, separated by location & year
@@ -162,9 +162,11 @@ ryewtplot1<- ggplot(subset(datwtrt, Cult=="Standard"|Cult=="Early"), aes(x = SR,
           facet_wrap(Year~Location)+
           theme_bw()
 print(ryewtplot1)
+```
 
+```{r rye biomass analysis}
 # model analysis for rye biomass
-model.ryewt<- lmer(Rye_wt ~ Cult * SR * Location + ( 1 | Rep:Year), data=datwtrt)
+model.ryewt<- lmer(Rye_wt ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
 summary(model.ryewt)
 anova(model.ryewt)
 
@@ -189,19 +191,25 @@ shapiro.test(resid.model.ryewt)
 # test assumptions fine
 
 # means
-ryewtemmeans1<- emmeans(model.ryewt.best, pairwise ~ Location)
-ryewtemmeans1 # Harrow & StJean are not different from each other, Agassiz lower than both
-plot(ryewtemmeans1, comparisons=T)
-
-ryewtemmeans2<- emmeans(model.ryewt.best, pairwise ~ SR)
-ryewtemmeans2 # 600 > 150, 150 & 300 not different, 300 & 600 not different (no signif diffs when WF rye plots removed)
-plot(ryewtemmeans2, comparisons=T)
+ryewtemmeans<- emmeans(model.ryewt.best, pairwise ~ SR)
+ryewtemmeans # 600 > 150, 300 > 150, 300 & 600 not different
+plot(ryewtemmeans, comparisons=T)
 ```
+*Best Model:*
+Rye_wt ~ SR + (1 | Year/Rep) + (1 | Location/Rep)
 
+*Assumptions:*
+Fine
+
+*Means:*
+contrast  estimate   SE  df t.ratio p.value
+ 150 - 300   -21.53 10.3 154 -2.087  0.0959 
+ 150 - 600   -22.71 10.4 154 -2.191  0.0759 
+ 300 - 600    -1.19 10.4 154 -0.114  0.9928
 
 ### Rye tillers
 
-```{r rye tillers}
+```{r rye tillers graphs}
 datwtrt$TAv
 
 # plot of rye tillers by cultivar & seeding rate, separated by location & year
@@ -211,9 +219,11 @@ tillplot1<- ggplot(subset(datwtrt, Cult=="Standard"|Cult=="Early"), aes(x = Cult
           theme_bw()
 print(tillplot1)
 # huge outlier -- St Jean 2019 plot 307 (TAv = 14.333)
+```
 
+```{r rye tiller analysis}
 # model analysis for rye tillering
-model.till<- lmer(TAv ~ Cult * SR * Location + ( 1 | Rep:Year), data=datwtrt)
+model.till<- lmer(TAv ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
 summary(model.till)
 anova(model.till)
 
@@ -305,7 +315,7 @@ diamplot1<- ggplot(subset(diamdat, Cult=="Standard"|Cult=="Early"), aes(x = Cult
 print(diamplot1)
 
 # model analysis for rye stem diameter
-model.diam<- lmer(DiamAv ~ Cult * SR + ( 1 | Rep:Year), data=diamdat)
+model.diam<- lmer(DiamAv ~ Cult * SR + (1 | Year / Rep), data=diamdat)
 summary(model.diam)
 anova(model.diam)
 
@@ -350,7 +360,7 @@ anthplot1<- ggplot(datwtrt, aes(x = Cult, y = anthesis, colour=factor(Location))
 print(anthplot1)
 
 # model analysis for rye stem diameter
-model.anth<- lmer(anthesis ~ Cult * Location + ( 1 | Rep:Year), data=datwtrt)
+model.anth<- lmer(anthesis ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
 summary(model.anth)
 anova(model.anth)
 
@@ -402,7 +412,7 @@ print(standplot1)
 # model analysis for corn stand 
 
 # test effect of rye
-model.stand<- lmer(Corn_stand ~ Trt_code * Location + ( 1 | Rep:Year), data=datw)
+model.stand<- lmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw)
 summary(model.stand)
 anova(model.stand)
 
@@ -435,7 +445,7 @@ plot(standemmeans, comparisons=T)
 
 ```{r corn stand analysis -- trts}
 # test effect of trts
-model.standtrt<- lmer(Corn_stand ~ Cult * SR * Location + ( 1 | Rep:Year), data=datwtrt)
+model.standtrt<- lmer(Corn_stand ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
 summary(model.standtrt)
 anova(model.standtrt)
 
@@ -465,7 +475,7 @@ standremmeans
 plot(standremmeans, comparisons=T) # Harrow > Agassiz & StJean
 
 # transformations (none really helped)
-model.standtrt2<- lmer((Corn_stand)^1/3 ~ Cult * SR * Location + ( 1 | Rep:Year), data=datwtrt)
+model.standtrt2<- lmer((Corn_stand)^1/3 ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
 summary(model.standtrt2)
 anova(model.standtrt2)
 
@@ -493,7 +503,7 @@ shapiro.test(resid.model.standtrt2)
 
 ```{r corn stand analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
-model.standw<- lmer(Corn_stand ~ Weediness * Cult * SR + ( 1 | Rep:Year), data=Hdatw)
+model.standw<- lmer(Corn_stand ~ Weediness * Cult * SR + (1 | Year / Rep), data=Hdatw)
 summary(model.standw)
 anova(model.standw)
 
@@ -523,7 +533,7 @@ shapiro.test(resid.model.standw)
 
 ```{r corn stand analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
-model.standw600<- lmer(Corn_stand ~ Weediness * Cult * Location + ( 1 | Rep:Year), data=datw1)
+model.standw600<- lmer(Corn_stand ~ Weediness * Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datw1)
 summary(model.standw600)
 anova(model.standw600)
 
@@ -554,8 +564,8 @@ plot(standw600emmeans, comparisons=T) # Harrow > StJean
 ```
 
 ```{r corn stand analysis -- w vs wf trts, S 600}
-# test effect of w/wf trt -> StJean S, 600
-model.standws<- lmer(Corn_stand ~ Weediness * Location + ( 1 | Rep:Year), data=datw2)
+# test effect of w/wf trt ->  S, 600
+model.standws<- lmer(Corn_stand ~ Weediness + (1 | Year / Rep) + (1 | Location / Rep), data=datw2)
 summary(model.standws)
 anova(model.standws)
 
@@ -585,7 +595,7 @@ shapiro.test(resid.model.standws)
 
 ```{r corn stand analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
-model.standwf<- lmer(Corn_stand ~ Trt_code + ( 1 | Rep:Year), data=Hdatwf)
+model.standwf<- lmer(Corn_stand ~ Trt_code + (1 | Year / Rep), data=Hdatwf)
 summary(model.standwf)
 anova(model.standwf)
 
@@ -613,7 +623,7 @@ shapiro.test(resid.model.standwf)
 
 ```{r corn stand analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
-model.standwf600<- lmer(Corn_stand ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf1)
+model.standwf600<- lmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1)
 summary(model.standwf600)
 anova(model.standwf600)
 
@@ -644,7 +654,7 @@ plot(standwf600emmeans, comparisons=T) # [Harrow E = Harrow S = Harrow NR] > [St
 
 ```{r corn stand analysis -- wf trts vs ctrl, S 600}
 # test effect of trts
-model.standwfs<- lmer(Corn_stand ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf2)
+model.standwfs<- lmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf2)
 summary(model.standwfs)
 anova(model.standwfs)
 
@@ -675,7 +685,7 @@ plot(standwfsemmeans, comparisons=T) # Harrow S > StJean S, rest =
 
 ```{r corn stand analysis -- wf trts, E & S all SR}
 # test effect within trts
-model.standwftrt<- lmer(Corn_stand ~ Cult * SR + ( 1 | Rep:Year), data=Hdatwftrt)
+model.standwftrt<- lmer(Corn_stand ~ Cult * SR + (1 | Year / Rep), data=Hdatwftrt)
 summary(model.standwftrt)
 anova(model.standwftrt)
 
@@ -703,7 +713,7 @@ shapiro.test(resid.model.standwftrt)
 
 ```{r corn stand analysis -- wf trts, E & S 600}
 # test effect within trts
-model.standwftrt600<- lmer(Corn_stand ~ Cult * Location + ( 1 | Rep:Year), data=datwftrt1)
+model.standwftrt600<- lmer(Corn_stand ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1)
 summary(model.standwftrt600)
 anova(model.standwftrt600)
 
@@ -748,7 +758,7 @@ print(htplot1)
 
 ```{r corn ht analysis -- trt vs ctrl}
 # test effect of trts vs ctrls
-model.ht<- lmer(Corn_ht_av ~ Trt_code * Location + ( 1 | Rep:Year), data=datw)
+model.ht<- lmer(Corn_ht_av ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw)
 summary(model.ht)
 anova(model.ht)
 
@@ -778,7 +788,7 @@ plot(htemmeans, comparisons=T) # ctrls > trts
 
 ```{r corn ht analysis -- trts}
 # trt effect
-model.ht.trt<- lmer(Corn_ht_av ~ Cult * SR * Location + ( 1 | Rep:Year), data=datwtrt)
+model.ht.trt<- lmer(Corn_ht_av ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
 summary(model.ht.trt)
 anova(model.ht.trt)
 
@@ -809,7 +819,7 @@ plot(htemmeans1, comparisons=T) # Harrow > Agassiz > StJean
 
 ```{r corn ht analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
-model.htw<- lmer(Corn_ht_av ~ Weediness * Cult * SR + ( 1 | Rep:Year), data=Hdatw)
+model.htw<- lmer(Corn_ht_av ~ Weediness * Cult * SR + (1 | Year / Rep), data=Hdatw)
 summary(model.htw)
 anova(model.htw)
 
@@ -842,7 +852,7 @@ plot(htwemmeans, comparisons=T)
 
 ```{r corn ht analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
-model.htw600<- lmer(Corn_ht_av ~ Weediness * Cult * Location + ( 1 | Rep:Year), data=datw1)
+model.htw600<- lmer(Corn_ht_av ~ Weediness * Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datw1)
 summary(model.htw600)
 anova(model.htw600)
 
@@ -878,8 +888,8 @@ plot(htw600emmeans1, comparisons=T)
 ```
 
 ```{r corn ht analysis -- w vs wf trts, S 600}
-# test effect of w/wf trt -> StJean S, 600
-model.htws<- lmer(Corn_ht_av ~ Weediness + ( 1 | Rep:Year), data=datw2)
+# test effect of w/wf trt -> S, 600
+model.htws<- lmer(Corn_ht_av ~ Weediness + (1 | Year / Rep) + (1 | Location / Rep), data=datw2)
 summary(model.htws)
 anova(model.htws)
 
@@ -909,7 +919,7 @@ shapiro.test(resid.model.htws)
 
 ```{r corn ht analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
-model.htwf<- lmer(Corn_ht_av ~ Trt_code + ( 1 | Rep:Year), data=Hdatwf)
+model.htwf<- lmer(Corn_ht_av ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=Hdatwf)
 summary(model.htwf)
 anova(model.htwf)
 
@@ -937,7 +947,7 @@ shapiro.test(resid.model.htwf)
 
 ```{r corn ht analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
-model.htwf600<- lmer(Corn_ht_av ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf1)
+model.htwf600<- lmer(Corn_ht_av ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1)
 summary(model.htwf600)
 anova(model.htwf600)
 
@@ -968,7 +978,7 @@ plot(htwf600emmeans, comparisons=T) #
 
 ```{r corn ht analysis -- wf trt vs ctrl, S 600}
 # test effect of trts
-model.htwfs<- lmer(Corn_ht_av ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf2)
+model.htwfs<- lmer(Corn_ht_av ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf2)
 summary(model.htwfs)
 anova(model.htwfs)
 
@@ -999,7 +1009,7 @@ plot(htwfsemmeans, comparisons=T) # Harrow > StJean
 
 ```{r corn ht analysis -- wf trts, E & S all SR}
 # test effect of trts
-model.htwftrt<- lmer(Corn_ht_av ~ Cult * SR + ( 1 | Rep:Year), data=Hdatwftrt)
+model.htwftrt<- lmer(Corn_ht_av ~ Cult * SR + (1 | Year / Rep), data=Hdatwftrt)
 summary(model.htwftrt)
 anova(model.htwftrt)
 
@@ -1027,7 +1037,7 @@ shapiro.test(resid.model.htwftrt)
 
 ```{r corn ht analysis -- wf trts, E & S 600}
 # test effect of trts
-model.htwftrt600<- lmer(Corn_ht_av ~ Cult * Location + ( 1 | Rep:Year), data=datwftrt1)
+model.htwftrt600<- lmer(Corn_ht_av ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1)
 summary(model.htwftrt600)
 anova(model.htwftrt600)
 
@@ -1072,7 +1082,7 @@ print(Mplot1)
 
 ```{r M corn count analysis -- trt vs ctrl}
 # model analysis for marketable corn count trts vs ctrls
-model.M<- lmer(M_count ~ Trt_code * Location + ( 1 | Rep:Year), data=datw)
+model.M<- lmer(M_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw)
 summary(model.M)
 anova(model.M)
 
@@ -1105,7 +1115,7 @@ plot(Mcountemmeans, comparisons=T) # WF > trts & W (W slightly lower than trts, 
 
 ```{r M corn count analysis -- trts}
 # model analysis for marketable corn count trts
-model.M.trt<- lmer(M_count ~ Cult * SR * Location + ( 1 | Rep:Year), data=datwtrt)
+model.M.trt<- lmer(M_count ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
 summary(model.M.trt)
 anova(model.M.trt)
 
@@ -1137,7 +1147,7 @@ plot(Mcountemmeans1, comparisons=T) # Harrow > Agassiz & StJean
 
 ```{r M corn count analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
-model.Mw<- lmer(M_count ~ Weediness * Cult * SR + ( 1 | Rep:Year), data=Hdatw)
+model.Mw<- lmer(M_count ~ Weediness * Cult * SR + (1 | Year / Rep), data=Hdatw)
 summary(model.Mw)
 anova(model.Mw)
 
@@ -1170,7 +1180,7 @@ plot(Mwemmeans, comparisons=T)
 
 ```{r Mcorn count analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
-model.Mw600<- lmer(M_count ~ Weediness * Cult * Location + ( 1 | Rep:Year), data=datw1)
+model.Mw600<- lmer(M_count ~ Weediness * Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datw1)
 summary(model.Mw600)
 anova(model.Mw600)
 
@@ -1204,7 +1214,7 @@ plot(Mw600emmeans, comparisons=T) # Harrow > StJean
 
 ```{r M corn count analysis -- w vs wf trts, S 600}
 # test effect of w/wf trt -> StJean S, 600
-model.Mws<- lmer(M_count ~ Weediness * Location + ( 1 | Rep:Year), data=datw2)
+model.Mws<- lmer(M_count ~ Weediness + (1 | Year / Rep) + (1 | Location / Rep), data=datw2)
 summary(model.Mws)
 anova(model.Mws)
 
@@ -1235,7 +1245,7 @@ plot(Mwsemmeans, comparisons=T) # Harrow WF > StJean W & WF & Harrow W
 
 ```{r M corn count analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
-model.Mwf<- lmer(M_count ~ Trt_code + ( 1 | Rep:Year), data=Hdatwf)
+model.Mwf<- lmer(M_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=Hdatwf)
 summary(model.Mwf)
 anova(model.Mwf)
 
@@ -1266,7 +1276,7 @@ plot(Mwfemmeans, comparisons=T) #
 
 ```{r M corn count analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
-model.Mwf600<- lmer(M_count ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf1)
+model.Mwf600<- lmer(M_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1)
 summary(model.Mwf600)
 anova(model.Mwf)
 
@@ -1297,7 +1307,7 @@ plot(Mwf600emmeans, comparisons=T) # Harrow > StJean
 
 ```{r M corn count analysis -- wf trt vs ctrl, S 600}
 # test effect of trts
-model.Mwfs<- lmer(M_count ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf2)
+model.Mwfs<- lmer(M_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf2)
 summary(model.Mwfs)
 anova(model.Mwfs)
 
@@ -1328,7 +1338,7 @@ plot(Mwfsemmeans, comparisons=T) # Harrow NR & S > StJean NR > StJean S
 
 ```{r M corn count analysis -- wf trts, E & S all SR}
 # test effect of trts
-model.Mwftrt<- lmer(M_count ~ Cult * SR + ( 1 | Rep:Year), data=Hdatwftrt)
+model.Mwftrt<- lmer(M_count ~ Cult * SR + (1 | Year / Rep), data=Hdatwftrt)
 summary(model.Mwftrt)
 anova(model.Mwftrt)
 
@@ -1363,7 +1373,7 @@ plot(Mwftrtemmeans1, comparisons=T) # 600 > 150
 
 ```{r M corn count analysis -- wf trts, E & S 600}
 # test effect of trts
-model.Mwftrt600<- lmer(M_count ~ Cult * Location + ( 1 | Rep:Year), data=datwftrt1)
+model.Mwftrt600<- lmer(M_count ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1)
 summary(model.Mwftrt600)
 anova(model.Mwftrt600)
 
@@ -1406,7 +1416,7 @@ print(Mwtplot1)
 
 ```{r M corn wt analysis -- trt vs ctrl}
 # model analysis for marketable cob weight trt vs ctrl
-model.Mwt<- lmer(M_wt ~ Trt_code * Location + ( 1 | Rep:Year), data=datw)
+model.Mwt<- lmer(M_wt ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw)
 summary(model.Mwt)
 anova(model.Mwt)
 
@@ -1437,7 +1447,7 @@ plot(Mwtemmeans, comparisons=T) # WF > trts & W (W slightly lower than trts, not
 
 ```{r M corn wt analysis -- trts}
 # model analysis for marketable cob weight trts
-model.Mwt.trt<- lmer(M_wt ~ Cult * SR * Location + ( 1 | Rep:Year), data=datwtrt)
+model.Mwt.trt<- lmer(M_wt ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
 summary(model.Mwt.trt)
 anova(model.Mwt.trt)
 
@@ -1472,7 +1482,7 @@ plot(Mwtemmeans2, comparison=T) # Harrow > Agassiz & StJean
 
 ```{r M corn wt analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
-model.Mwtw<- lmer(M_wt ~ Weediness * Cult * SR + ( 1 | Rep:Year), data=Hdatw)
+model.Mwtw<- lmer(M_wt ~ Weediness * Cult * SR + (1 | Year / Rep), data=Hdatw)
 summary(model.Mwtw)
 anova(model.Mwtw)
 
@@ -1508,7 +1518,7 @@ plot(Mwtwemmeans, comparisons=T)
 
 ```{r M corn wt analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
-model.Mwtw600<- lmer(M_wt ~ Weediness * Cult * Location + ( 1 | Rep:Year), data=datw1)
+model.Mwtw600<- lmer(M_wt ~ Weediness * Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datw1)
 summary(model.Mwtw600)
 anova(model.Mwtw600)
 
@@ -1541,8 +1551,8 @@ plot(Mwtw600emmeans, comparisons=T)
 ```
 
 ```{r M corn wt analysis -- w vs wf trts, S 600}
-# test effect of w/wf trt -> StJean S, 600
-model.Mwtws<- lmer(M_wt ~ Weediness + ( 1 | Rep:Year), data=datw2)
+# test effect of w/wf trt ->  S, 600
+model.Mwtws<- lmer(M_wt ~ Weediness + (1 | Year / Rep) + (1 | Location / Rep), data=datw2)
 summary(model.Mwtws)
 anova(model.Mwtws)
 
@@ -1572,7 +1582,7 @@ shapiro.test(resid.model.Mwtws)
 
 ```{r M corn wt analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
-model.Mwtwf<- lmer(M_wt ~ Trt_code + ( 1 | Rep:Year), data=Hdatwf)
+model.Mwtwf<- lmer(M_wt ~ Trt_code + (1 | Year / Rep), data=Hdatwf)
 summary(model.Mwtwf)
 anova(model.Mwtwf)
 
@@ -1600,7 +1610,7 @@ shapiro.test(resid.model.Mwtwf)
 
 ```{r M corn wt analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
-model.Mwt600wf<- lmer(M_wt ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf1)
+model.Mwt600wf<- lmer(M_wt ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1)
 summary(model.Mwt600wf)
 anova(model.Mwt600wf)
 
@@ -1631,7 +1641,7 @@ plot(Mwt600wfemmeans, comparisons=T) # Harrow > StJean
 
 ```{r M corn wt analysis -- wf trt vs ctrl, S 600}
 # test effect of trts
-model.Mwtswf<- lmer(M_wt ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf2)
+model.Mwtswf<- lmer(M_wt ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf2)
 summary(model.Mwtswf)
 anova(model.Mwtswf)
 
@@ -1666,7 +1676,7 @@ plot(Mwtswfemmeans1, comparisons=T) # Harrow > StJean
 
 ```{r M corn wt analysis -- wf trts, E & S all SR}
 # test effect of trts
-model.Mwtwftrt<- lmer(M_wt ~ Cult * SR + ( 1 | Rep:Year), data=Hdatwftrt)
+model.Mwtwftrt<- lmer(M_wt ~ Cult * SR + (1 | Year / Rep), data=Hdatwftrt)
 summary(model.Mwtwftrt)
 anova(model.Mwtwftrt)
 
@@ -1694,7 +1704,7 @@ shapiro.test(resid.model.Mwtwftrt)
 
 ```{r M corn wt analysis -- wf trts, E & S 600}
 # test effect of trts
-model.Mwtwftrt600<- lmer(M_wt ~ Cult * Location + ( 1 | Rep:Year), data=datwftrt1)
+model.Mwtwftrt600<- lmer(M_wt ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1)
 summary(model.Mwtwftrt600)
 anova(model.Mwtwftrt600)
 
@@ -1737,7 +1747,7 @@ print(UMplot1)
 
 ``` {r UM corn count analysis -- trt vs ctrl}
 # model analysis for unmarketable cob count trt vs ctrl
-model.UM<- lmer(UM_count ~ Trt_code * Location + ( 1 | Rep:Year), data=datw)
+model.UM<- lmer(UM_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw)
 summary(model.UM)
 anova(model.UM)
 
@@ -1768,7 +1778,7 @@ plot(UMcountemmeans, comparisons=T) # WF > W, S3 > W, Trts = WF
 
 ```{r UM corn count analysis -- trts}
 # model analysis for unmarketable cob count trts
-model.UM.trt<- lmer(UM_count ~ Cult * SR * Location + ( 1 | Rep:Year), data=datwtrt)
+model.UM.trt<- lmer(UM_count ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
 summary(model.UM.trt)
 anova(model.UM.trt)
 
@@ -1803,7 +1813,7 @@ plot(UMcountemmeans2, comparisons=T) # Harrow > Agassiz & StJean
 
 ```{r UM corn count analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
-model.UMw<- lmer(UM_count ~ Weediness * Cult * SR + ( 1 | Rep:Year), data=Hdatw)
+model.UMw<- lmer(UM_count ~ Weediness * Cult * SR + (1 | Year / Rep), data=Hdatw)
 summary(model.UMw)
 anova(model.UMw)
 
@@ -1833,7 +1843,7 @@ shapiro.test(resid.model.UMw)
 
 ```{r UM corn count analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
-model.UMw600<- lmer(UM_count ~ Weediness * Cult * Location + ( 1 | Rep:Year), data=datw1)
+model.UMw600<- lmer(UM_count ~ Weediness * Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datw1)
 summary(model.UMw600)
 anova(model.UMw600)
 
@@ -1872,8 +1882,8 @@ plot(UMw600emmeans1, comparisons=T) # Harrow > StJean
 ```
 
 ```{r UM corn count analysis -- w vs wf trts, S 600}
-# test effect of w/wf trt -> StJean S, 600
-model.UMws<- lmer(UM_count ~ Weediness + ( 1 | Rep:Year), data=datw2)
+# test effect of w/wf trt -> S, 600
+model.UMws<- lmer(UM_count ~ Weediness + (1 | Year / Rep) + (1 | Location / Rep), data=datw2)
 summary(model.UMws)
 anova(model.UMws)
 
@@ -1903,7 +1913,7 @@ shapiro.test(resid.model.UMws)
 
 ```{r UM corn count analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
-model.UMwf<- lmer(UM_count ~ Trt_code + ( 1 | Rep:Year), data=Hdatwf)
+model.UMwf<- lmer(UM_count ~ Trt_code + (1 | Year / Rep), data=Hdatwf)
 summary(model.UMwf)
 anova(model.UMwf)
 
@@ -1931,7 +1941,7 @@ shapiro.test(resid.model.UMwf)
 
 ```{r UM corn count analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
-model.UMwf600<- lmer(UM_count ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf1)
+model.UMwf600<- lmer(UM_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1)
 summary(model.UMwf600)
 anova(model.UMwf)
 
@@ -1962,7 +1972,7 @@ plot(UMwf600emmeans, comparisons=T) # StJean: E > S > NR; Harrow: all =
 
 ```{r UM corn count analysis -- wf trt vs ctrl, S 600}
 # test effect of trts
-model.UMwfs<- lmer(UM_count ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf2)
+model.UMwfs<- lmer(UM_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf2)
 summary(model.UMwfs)
 anova(model.UMwfs)
 
@@ -1990,7 +2000,7 @@ shapiro.test(resid.model.UMwfs)
 
 ```{r UM corn count analysis -- wf trts, E & S all SR}
 # test effect of trts
-model.UMwftrt<- lmer(UM_count ~ Cult * SR + ( 1 | Rep:Year), data=Hdatwftrt)
+model.UMwftrt<- lmer(UM_count ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=Hdatwftrt)
 summary(model.UMwftrt)
 anova(model.UMwftrt)
 
@@ -2018,7 +2028,7 @@ shapiro.test(resid.model.UMwftrt)
 
 ```{r UM corn count analysis -- wf trts, E & S 600}
 # test effect of trts
-model.UMwftrt600<- lmer(UM_count ~ Cult * Location + ( 1 | Rep:Year), data=datwftrt1)
+model.UMwftrt600<- lmer(UM_count ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1)
 summary(model.UMwftrt600)
 anova(model.UMwftrt600)
 
@@ -2061,7 +2071,7 @@ print(UMwtplot1)
 
 ```{r UM corn wt analysis -- trt vs ctrl}
 # model analysis for unmarketable cob weight trt vs ctrl
-model.UMwt<- lmer(UM_wt ~ Trt_code * Location + ( 1 | Rep:Year), data=datw)
+model.UMwt<- lmer(UM_wt ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw)
 summary(model.UMwt)
 anova(model.UMwt)
 
@@ -2092,7 +2102,7 @@ plot(UMwtemmeans, comparisons=T) # Agassiz: WF > trts & W, Harrow & StJean all s
 
 ```{r UM corn wt analysis -- trts}
 # model analysis for unmarketable cob weight trt vs ctrl
-model.UMwt.trt<- lmer(UM_wt ~ Cult * SR * Location + ( 1 | Rep:Year), data=datwtrt)
+model.UMwt.trt<- lmer(UM_wt ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
 summary(model.UMwt.trt)
 anova(model.UMwt.trt)
 
@@ -2123,7 +2133,7 @@ plot(UMwtemmeans1, comparisons=T) # Harrow & StJean > Agassiz
 
 ```{r UM corn wt analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
-model.UMwtw<- lmer(UM_wt ~ Weediness * Cult * SR + ( 1 | Rep:Year), data=Hdatw)
+model.UMwtw<- lmer(UM_wt ~ Weediness * Cult * SR + (1 | Year / Rep), data=Hdatw)
 summary(model.UMwtw)
 anova(model.UMwtw)
 
@@ -2155,7 +2165,7 @@ UMoutlier.rm<- Hdatw[-c(grep("6356", Hdatw$UM_wt)),]
 grep("6356", UMoutlier.rm$UM_wt)
 
 # analysis again w/o outlier
-model.UMwtw2<- lmer(UM_wt ~ Weediness * Cult * SR + ( 1 | Rep:Year), data=UMoutlier.rm)
+model.UMwtw2<- lmer(UM_wt ~ Weediness * Cult * SR + (1 | Year / Rep), data=UMoutlier.rm)
 summary(model.UMwtw2)
 anova(model.UMwtw2)
 
@@ -2186,7 +2196,7 @@ shapiro.test(resid.model.UMwtw2)
 
 ```{r UM corn wt analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
-model.UMwtw600<- lmer(UM_wt ~ Weediness * Cult * Location + ( 1 | Rep:Year), data=datw1)
+model.UMwtw600<- lmer(UM_wt ~ Weediness * Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datw1)
 summary(model.UMwtw600)
 anova(model.UMwtw600)
 
@@ -2218,8 +2228,8 @@ plot(UMwtw600emmeans, comparisons=T)
 ```
 
 ```{r UM corn wt analysis -- w vs wf trts, S 600}
-# test effect of w/wf trt -> StJean S, 600
-model.UMwtws<- lmer(UM_wt ~ Weediness + ( 1 | Rep:Year), data=datw2)
+# test effect of w/wf trt -> S, 600
+model.UMwtws<- lmer(UM_wt ~ Weediness + (1 | Year / Rep) + (1 | Location / Rep), data=datw2)
 summary(model.UMwtws)
 anova(model.UMwtws)
 
@@ -2249,7 +2259,7 @@ shapiro.test(resid.model.UMwtws)
 
 ```{r UM corn wt analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
-model.UMwtwf<- lmer(UM_wt ~ Trt_code + ( 1 | Rep:Year), data=Hdatwf)
+model.UMwtwf<- lmer(UM_wt ~ Trt_code + (1 | Year / Rep), data=Hdatwf)
 summary(model.UMwtwf)
 anova(model.UMwtwf)
 
@@ -2277,7 +2287,7 @@ shapiro.test(resid.model.UMwtwf)
 
 ```{r UM corn wt analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
-model.UMwt600wf<- lmer(UM_wt ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf1)
+model.UMwt600wf<- lmer(UM_wt ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1)
 summary(model.UMwt600wf)
 anova(model.UMwt600wf)
 
@@ -2308,7 +2318,7 @@ plot(UMwt600wfemmeans, comparisons=T) # StJean NR < rest
 
 ```{r UM corn wt analysis -- wf trt vs ctrl, S 600}
 # test effect of trts
-model.UMwtswf<- lmer(UM_wt ~ Trt_code * Location + ( 1 | Rep:Year), data=datwf2)
+model.UMwtswf<- lmer(UM_wt ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf2)
 summary(model.UMwtswf)
 anova(model.UMwtswf)
 
@@ -2339,7 +2349,7 @@ plot(UMwtswfemmeans, comparisons=T) # Harrow > StJean
 
 ```{r UM corn wt analysis -- wf trts, E & S all SR}
 # test effect of trts
-model.UMwtwftrt<- lmer(UM_wt ~ Cult * SR + ( 1 | Rep:Year), data=Hdatwftrt)
+model.UMwtwftrt<- lmer(UM_wt ~ Cult * SR + (1 | Year / Rep), data=Hdatwftrt)
 summary(model.UMwtwftrt)
 anova(model.UMwtwftrt)
 
@@ -2367,7 +2377,7 @@ shapiro.test(resid.model.UMwtwftrt)
 
 ```{r UM corn wt analysis -- wf trts, E & S 600}
 # test effect of trts
-model.UMwtwftrt600<- lmer(UM_wt ~ Cult * Location + ( 1 | Rep:Year), data=datwftrt1)
+model.UMwtwftrt600<- lmer(UM_wt ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1)
 summary(model.UMwtwftrt600)
 anova(model.UMwtwftrt600)
 
@@ -2399,14 +2409,17 @@ shapiro.test(resid.model.UMwtwftrt600)
 
 #### Counts
 
-```{r}
+```{r weed count tables}
 # table with sums of weed counts & standard deviation for within each combination of year, location, cultivar, seeding rate, and time 
 Wtable<-wdat %>%
   group_by(Year, Location, Cult, SR, Time) %>%
   summarize(Sum=sum(Count), SD=sd(Count))
 
 Wtable$Time<- factor(Wtable$Time, levels = c("PRE","28DAT","56DAT")) # reorder Time levels so chronological
+```
 
+
+```{r weed count analysis -- graphs}
 # plot sum of weed counts & SD from table against seeding rate, factored by cultivar (shape) & time (colour), facted by location & year
 ## dodged position for easier reading
 Wplot<- ggplot(Wtable, aes(x=SR, y=Sum, colour=factor(Time), shape=factor(Cult))) +
@@ -2424,15 +2437,22 @@ Wplot2<- ggplot(Wtable, aes(x=Time, y=Sum, colour=factor(SR), shape=factor(Cult)
   facet_wrap(Location~Year) +
   theme_bw()
 print(Wplot2)
+```
 
 
-
+```{r weed count analysis -- models}
 # weed count models
 ## count data so glmer used with poisson distribution
 ### since repeated measures, plot added as random effect (not nested or cross classified)
-model.weedcount<- glmer(Count ~ Cult * SR * Location + (1 | Rep : Year) + (1 | Plot), data=wdat, family = poisson)
+
+# lmer
+model.weedcount<- lmer(Count ~ Cult * SR * Location * Time + (1 | Rep : Year) + (1 | Plot), data=wdat)
 summary(model.weedcount)
-Anova(model.weedcount, type="III") # note: different anova test used 
+Anova(model.weedcount, type="III")
+
+# glmer
+model.weedcount2<- glmer(Count ~ Cult * SR * Location * Time + (1 | Rep : Year) + (1 | Plot), data=wdat, family=poisson)
+Anova(model.weedcount2, type="III")
 
 # check residuals
 resid.model.wcount<- resid(model.weedcount)
@@ -2452,11 +2472,12 @@ qqnorm(resid.model.wcount) # curvy shape
 shapiro.test(resid.model.wcount)
 # assumptions not met, needs transformations? Or not using right format of data?
 ```
+-> need to decide whether to use glmer or lmer -- diff results or either 
 
 
 #### Biomass
 
-```{r error=T}
+```{r weed biomass tables}
 # table with sums of weed biomass for each combination of year, location, cultivar, seeding rate, & plot
 WWsumtable<- subset(wdat, Time=="56DAT") %>%
   group_by(Year, Location, Cult, SR, Plot) %>%
@@ -2471,7 +2492,9 @@ WWmeantable$Cult<- factor(WWmeantable$Cult, levels = c("Standard", "Early", "NoR
 WWtable<-subset(wdat, Time=="56DAT") %>%
   group_by(Year, Location, Cult, SR, Plot, Rep, Trt_num) %>%
   summarize(W=sum(Weight), Wsd=sd(Weight))
+```
 
+```{r weed biomass analysis -- graphs, error=T}
 wplot<- ggplot(WWtable, aes(x = SR, y = W, fill = Cult)) + 
           geom_boxplot() +
           theme_bw()
@@ -2492,9 +2515,10 @@ WWplot<- ggplot(WWmeantable, aes(x=Cult, y=WMean, colour=factor(SR), group=inter
   facet_wrap(Location~Year) + 
   theme_bw()
 print(WWplot)
+```
 
 
-
+```{r }
 # weed biomass models  
 model.ww<- lmer(Weight ~ Cult * SR * Location + (1 | Rep : Year), data=subset(wdat, Time=="56DAT"))
 summary(model.ww)

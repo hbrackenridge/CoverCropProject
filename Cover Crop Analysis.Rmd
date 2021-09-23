@@ -28,7 +28,7 @@ datr is a version of datw that contains only rye treatments, no controls.
 The second data file, named wdat, contains weed measurement timing, quadrat, count, stage, and biomass. 
 
 
-```{r load datasets, results='hide', message=FALSE, warning=FALSE, 'load-data-&-packages'}
+```{r load VAR datasets, results='hide', message=FALSE, warning=FALSE, 'load-data-&-packages'}
 # load datasets
 dat<- read.csv("VAR_All.csv")
 str(dat) # view data variables & adjust type as necessary
@@ -95,10 +95,8 @@ Sdatwftrt2<- subset(Sdatwftrt, Year=="2021")
 # combine Harrow & StJean WF trt data
 datwftrt1<- rbind(Hdatwftrt1, Sdatwftrt1)
 datwftrt2<- rbind(Hdatwftrt2, Sdatwftrt2)
-
-
-
-
+```
+```{r load VAR weeds data}
 wdat<- read.csv("VAR_Weeds_Reduced.csv")
 str(wdat) # view data variables & adjust type as necessary
 wdat$Plot<- as.factor(wdat$Plot)
@@ -107,7 +105,8 @@ wdat$Trt_num<- as.factor(wdat$Trt_num)
 wdat$SR<- as.factor(wdat$SR)
 
 wdat<- subset(wdat, Nitro=="1")
-
+```
+```{r load packages}
 # load packages
 library(ggplot2)
 library(dplyr)
@@ -198,10 +197,20 @@ plot(ryewtemmeans, comparisons=T)
 *Best Model:*
 Rye_wt ~ SR + (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+   Sum Sq Mean Sq NumDF  DenDF F value  Pr(>F)  
+SR  18897  9448.3     2 156.37  3.0613 0.04965 *
+
 *Assumptions:*
 Fine
 
 *Means:*
+ SR  emmean   SE   df lower.CL upper.CL
+ 150    172 10.6 4.13      143      201
+ 300    194 10.6 4.13      165      223
+ 600    195 10.7 4.20      166      224
+
+*Contrasts:*
 contrast  estimate   SE  df t.ratio p.value
  150 - 300   -21.53 10.3 154 -2.087  0.0959 
  150 - 600   -22.71 10.4 154 -2.191  0.0759 
@@ -267,7 +276,7 @@ print(tillplot2)
 # still  some outliers in Harrow 2020 & 2019 data
 
 # model analysis for rye tillering
-model.till2<- lmer(TAv ~ Cult * SR * Location + ( 1 | Rep:Year), data=Toutlier.rm)
+model.till2<- lmer(TAv ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=Toutlier.rm)
 summary(model.till2)
 anova(model.till2)
 
@@ -291,14 +300,31 @@ qqnorm(resid.model.till2)
 shapiro.test(resid.model.till2)
 # test assumptions fine
 
-tillemmeans1<- emmeans(model.till.best2, pairwise ~ SR|Location)
-tillemmeans1
-plot(tillemmeans1, comparisons=T)
-
-tillemmeans2<- emmeans(model.till.best2, pairwise ~ Cult|Location)
-tillemmeans2
-plot(tillemmeans2, comparisons=T)
+tillemmeans<- emmeans(model.till.best2, pairwise ~ SR)
+tillemmeans
+plot(tillemmeans, comparisons=T)
 ```
+*Best model:*
+TAv ~ SR + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+   Sum Sq Mean Sq NumDF  DenDF F value   Pr(>F)    
+SR 40.795  20.397     2 148.97   10.18 7.18e-05 ***
+
+*Assumptions:*
+Fine
+
+*Means:*
+ SR  emmean    SE   df lower.CL upper.CL
+ 150   4.82 0.512 4.22     3.43     6.22
+ 300   4.06 0.513 4.25     2.67     5.45
+ 600   3.58 0.514 4.27     2.19     4.97
+
+*Contrasts:*
+ contrast  estimate    SE  df t.ratio p.value
+ 150 - 300    0.761 0.277 138 2.750   0.0184 *
+ 150 - 600    1.241 0.278 138 4.465   <.0001 *
+ 300 - 600    0.480 0.279 138 1.720   0.2015 
 
 
 ### Rye stem diameter
@@ -347,7 +373,35 @@ diamemmeans2<- emmeans(model.diam.best, pairwise ~ SR)
 diamemmeans2
 plot(diamemmeans2, comparisons=T)
 ```
+*Best Model:*
+DiamAv ~ Cult + SR + (1 | Year/Rep)
 
+*Effects:*
+      Sum Sq Mean Sq NumDF DenDF F value    Pr(>F)    
+Cult 12.2967 12.2967     1    57 116.728 2.047e-15 ***
+SR    2.7929  1.3964     2    57  13.256 1.873e-05 ***
+
+*Assumptions:*
+Possible outlier on lower end but fine
+
+*Means:*
+ Cult     emmean   SE   df lower.CL upper.CL
+ Early      3.83 0.36 2.05     2.32     5.35
+ Standard   4.66 0.36 2.05     3.14     6.18
+ 
+  SR  emmean    SE   df lower.CL upper.CL
+ 150   4.45 0.363 2.09     2.95     5.94
+ 300   4.31 0.363 2.09     2.82     5.81
+ 600   3.98 0.363 2.09     2.48     5.48
+
+*Contrasts:*
+ contrast         estimate     SE df t.ratio p.value
+ Early - Standard   -0.827 0.0765 57 -10.804 <.0001 *
+
+ contrast  estimate     SE df t.ratio p.value
+ 150 - 300    0.135 0.0937 57 1.442   0.3266 
+ 150 - 600    0.469 0.0937 57 5.002   <.0001 *
+ 300 - 600    0.334 0.0937 57 3.560   0.0022 *
 
 ### Rye anthesis
 ```{r rye anthesis}
@@ -418,7 +472,7 @@ anova(model.stand)
 
 model.stand.best<- get_model(lmerTest::step(model.stand, reduce.random=F))
 summary(model.stand.best)
-Anova(model.stand.best, type="III")
+anova(model.stand.best)
 
 # check residuals
 resid.model.stand<- resid(model.stand.best)
@@ -442,6 +496,58 @@ standemmeans
 plot(standemmeans, comparisons=T)
 # some trts higher than W1N
 ```
+*Best Model:*
+Corn_stand ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+         Sum Sq Mean Sq NumDF  DenDF F value  Pr(>F)  
+Trt_code 709.11   101.3     7 222.27  2.5881 0.01386 *
+
+*Assumptions:*
+slightly left skewed
+
+*Means:*
+ Trt_code emmean   SE   df lower.CL upper.CL
+ E1W1N      31.8 2.91 4.31     24.0     39.7
+ E2W1N      30.9 2.91 4.31     23.0     38.8
+ E3W1N      30.9 2.91 4.31     23.0     38.7
+ S1W1N      29.9 2.88 4.13     22.0     37.8
+ S2W1N      30.5 2.88 4.13     22.6     38.4
+ S3W1N      32.9 2.88 4.13     25.0     40.9
+ W1N        26.8 2.88 4.13     18.9     34.7
+ WF1N       29.7 2.88 4.13     21.8     37.6
+
+*Contrasts:*
+ contrast      estimate   SE  df t.ratio p.value
+ E1W1N - E2W1N   0.9286 1.67 218  0.555  0.9993 
+ E1W1N - E3W1N   0.9643 1.67 218  0.577  0.9991 
+ E1W1N - S1W1N   1.9444 1.62 218  1.198  0.9320 
+ E1W1N - S2W1N   1.3507 1.62 218  0.832  0.9911 
+ E1W1N - S3W1N  -1.1181 1.62 218 -0.689  0.9972 
+ E1W1N - W1N     5.0069 1.62 218  3.084  0.0468 *
+ E1W1N - WF1N    2.1007 1.62 218  1.294  0.9004 
+ E2W1N - E3W1N   0.0357 1.67 218  0.021  1.0000 
+ E2W1N - S1W1N   1.0159 1.62 218  0.626  0.9985 
+ E2W1N - S2W1N   0.4221 1.62 218  0.260  1.0000 
+ E2W1N - S3W1N  -2.0466 1.62 218 -1.261  0.9122 
+ E2W1N - W1N     4.0784 1.62 218  2.512  0.1960 
+ E2W1N - WF1N    1.1721 1.62 218  0.722  0.9963 
+ E3W1N - S1W1N   0.9802 1.62 218  0.604  0.9988 
+ E3W1N - S2W1N   0.3864 1.62 218  0.238  1.0000 
+ E3W1N - S3W1N  -2.0823 1.62 218 -1.283  0.9045 
+ E3W1N - W1N     4.0427 1.62 218  2.490  0.2053 
+ E3W1N - WF1N    1.1364 1.62 218  0.700  0.9969 
+ S1W1N - S2W1N  -0.5938 1.56 218 -0.380  0.9999 
+ S1W1N - S3W1N  -3.0625 1.56 218 -1.958  0.5127 
+ S1W1N - W1N     3.0625 1.56 218  1.958  0.5127 
+ S1W1N - WF1N    0.1562 1.56 218  0.100  1.0000 
+ S2W1N - S3W1N  -2.4688 1.56 218 -1.578  0.7627 
+ S2W1N - W1N     3.6562 1.56 218  2.338  0.2782 
+ S2W1N - WF1N    0.7500 1.56 218  0.480  0.9997 
+ S3W1N - W1N     6.1250 1.56 218  3.916  0.0030 *
+ S3W1N - WF1N    3.2188 1.56 218  2.058  0.4456 
+ W1N - WF1N     -2.9062 1.56 218 -1.858  0.5811
+
 
 ```{r corn stand analysis -- trts}
 # test effect of trts
@@ -451,7 +557,7 @@ anova(model.standtrt)
 
 model.standtrt.best<- get_model(lmerTest::step(model.standtrt, reduce.random=F))
 summary(model.standtrt.best)
-Anova(model.standtrt.best, type="III")
+anova(model.standtrt.best)
 
 # check residuals
 resid.model.standtrt<- resid(model.standtrt.best)
@@ -470,9 +576,6 @@ qqnorm(resid.model.standtrt) # messy on ends
 shapiro.test(resid.model.standtrt)
 # data assumptions not great... try transformations
 
-standremmeans<- emmeans(model.stand.best, pairwise ~ Location)
-standremmeans
-plot(standremmeans, comparisons=T) # Harrow > Agassiz & StJean
 
 # transformations (none really helped)
 model.standtrt2<- lmer((Corn_stand)^1/3 ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
@@ -500,6 +603,18 @@ qqnorm(resid.model.standtrt2) # messy on ends
 shapiro.test(resid.model.standtrt2)
 
 ```
+*Best Model:*
+Corn_stand ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+slightly left skewed -- cubed slightly helped but not really
+
+*Means:*
+None
+
 
 ```{r corn stand analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
@@ -509,7 +624,7 @@ anova(model.standw)
 
 model.standw.best<- get_model(lmerTest::step(model.standw, reduce.random=F))
 summary(model.standw.best)
-Anova(model.standw.best, type="III")
+anova(model.standw.best)
 
 # check residuals
 resid.model.standw<- resid(model.standw.best)
@@ -530,6 +645,18 @@ shapiro.test(resid.model.standw)
 
 # no effect of weediness
 ```
+*Best Model:*
+Corn_stand ~ (1 | Year/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Good
+
+*Means:*
+None
+
 
 ```{r corn stand analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
@@ -539,7 +666,7 @@ anova(model.standw600)
 
 model.standw600.best<- get_model(lmerTest::step(model.standw600, reduce.random=F))
 summary(model.standw600.best)
-Anova(model.standw600.best, type="III")
+anova(model.standw600.best)
 
 # check residuals
 resid.model.standw600<- resid(model.standw600.best)
@@ -557,11 +684,21 @@ qqnorm(resid.model.standw600)
 shapiro.test(resid.model.standw600)
 
 # means
-standw600emmeans<- emmeans(model.standw600.best, pairwise ~ Location)
-standw600emmeans
-plot(standw600emmeans, comparisons=T) # Harrow > StJean
+
 # no weediness effect
 ```
+*Best Model:*
+Corn_stand ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Not great -- not a lot of data
+
+*Means:*
+None
+
 
 ```{r corn stand analysis -- w vs wf trts, S 600}
 # test effect of w/wf trt ->  S, 600
@@ -571,7 +708,7 @@ anova(model.standws)
 
 model.standws.best<- get_model(lmerTest::step(model.standws, reduce.random=F))
 summary(model.standws.best)
-Anova(model.standws.best, type="III")
+anova(model.standws.best)
 
 # check residuals
 resid.model.standws<- resid(model.standws.best)
@@ -592,6 +729,18 @@ shapiro.test(resid.model.standws)
 
 # no effect of weediness
 ```
+*Best Model:*
+Corn_stand ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Not great -- not a lot of data
+
+*Means:*
+None
+
 
 ```{r corn stand analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
@@ -601,7 +750,7 @@ anova(model.standwf)
 
 model.standwf.best<- get_model(lmerTest::step(model.standwf, reduce.random=F))
 summary(model.standwf.best)
-Anova(model.standwf.best, type="III")
+anova(model.standwf.best)
 
 # check residuals
 resid.model.standwf<- resid(model.standwf.best)
@@ -620,6 +769,18 @@ shapiro.test(resid.model.standwf)
 
 # no main effects -> WF no rye not diff than trts
 ```
+*Best Model:*
+Corn_stand ~ (1 | Year/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Fine
+
+*Means:*
+None
+
 
 ```{r corn stand analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
@@ -629,7 +790,7 @@ anova(model.standwf600)
 
 model.standwf600.best<- get_model(lmerTest::step(model.standwf600, reduce.random=F))
 summary(model.standwf600.best)
-Anova(model.standwf600.best, type="III")
+anova(model.standwf600.best)
 
 # check residuals
 resid.model.standwf600<- resid(model.standwf600.best)
@@ -647,10 +808,32 @@ qqnorm(resid.model.standwf600)
 shapiro.test(resid.model.standwf600)
 
 # means
-standwf600emmeans<- emmeans(model.standwf600.best, pairwise ~ Trt_code*Location)
+standwf600emmeans<- emmeans(model.standwf600.best, pairwise ~ Trt_code)
 standwf600emmeans
 plot(standwf600emmeans, comparisons=T) # [Harrow E = Harrow S = Harrow NR] > [StJean E = StJean S] > StJean NR, (Harrow NR = StJean E)
 ```
+*Best Model:*
+Corn_stand ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+         Sum Sq Mean Sq NumDF  DenDF F value   Pr(>F)   
+Trt_code 297.06  148.53     2 31.171   7.597 0.002053 **
+
+*Assumptions:*
+Not great -- hist square-like
+
+*Means:*
+ Trt_code emmean   SE   df lower.CL upper.CL
+ E3WF1N     31.0 6.48 1.11    -34.7     96.8
+ S3WF1N     30.1 6.48 1.11    -35.6     95.9
+ WF1N       24.5 6.48 1.11    -41.2     90.3
+
+*Contrasts:*
+ contrast        estimate   SE   df t.ratio p.value
+ E3WF1N - S3WF1N    0.917 1.81 24.2 0.508   0.8683 
+ E3WF1N - WF1N      6.500 1.81 24.2 3.601   0.0039 *
+ S3WF1N - WF1N      5.583 1.81 24.2 3.093   0.0132 *
+
 
 ```{r corn stand analysis -- wf trts vs ctrl, S 600}
 # test effect of trts
@@ -660,7 +843,7 @@ anova(model.standwfs)
 
 model.standwfs.best<- get_model(lmerTest::step(model.standwfs, reduce.random=F))
 summary(model.standwfs.best)
-Anova(model.standwfs.best, type="III")
+anova(model.standwfs.best)
 
 # check residuals
 resid.model.standwfs<- resid(model.standwfs.best)
@@ -678,11 +861,20 @@ qqnorm(resid.model.standwfs)
 shapiro.test(resid.model.standwfs)
 
 # means
-standwfsemmeans<- emmeans(model.standwfs.best, pairwise ~ Trt_code*Location)
-standwfsemmeans
-plot(standwfsemmeans, comparisons=T) # Harrow S > StJean S, rest =
 ```
+*Best Model:*
+Corn_stand ~ (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+Not great -- not a lot of data
+
+*Means:*
+None
+ 
+ 
 ```{r corn stand analysis -- wf trts, E & S all SR}
 # test effect within trts
 model.standwftrt<- lmer(Corn_stand ~ Cult * SR + (1 | Year / Rep), data=Hdatwftrt)
@@ -691,7 +883,7 @@ anova(model.standwftrt)
 
 model.standwftrt.best<- get_model(lmerTest::step(model.standwftrt, reduce.random=F))
 summary(model.standwftrt.best)
-Anova(model.standwftrt.best, type="III")
+anova(model.standwftrt.best)
 
 # check residuals
 resid.model.standwftrt<- resid(model.standwftrt.best)
@@ -710,6 +902,18 @@ shapiro.test(resid.model.standwftrt)
 
 # no main effects
 ```
+*Best Model:*
+Corn_stand ~ (1 | Year/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Good
+
+*Means:*
+None
+
 
 ```{r corn stand analysis -- wf trts, E & S 600}
 # test effect within trts
@@ -719,7 +923,7 @@ anova(model.standwftrt600)
 
 model.standwftrt600.best<- get_model(lmerTest::step(model.standwftrt600, reduce.random=F))
 summary(model.standwftrt600.best)
-Anova(model.standwftrt600.best, type="III")
+anova(model.standwftrt600.best)
 
 # check residuals
 resid.model.standwftrt600<- resid(model.standwftrt600.best)
@@ -737,10 +941,19 @@ qqnorm(resid.model.standwftrt600)
 shapiro.test(resid.model.standwftrt600)
 
 # means
-standwftrt600emmeans<- emmeans(model.standwftrt600.best, pairwise ~ Location)
-standwftrt600emmeans
-plot(standwftrt600emmeans, comparisons=T) # Harrow > StJean
 ```
+*Best Model:*
+Corn_stand ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Not great -- not a lot of data
+
+*Means:*
+None
+
 
 
 ### Corn height
@@ -785,6 +998,58 @@ htemmeans<- emmeans(model.ht.best, pairwise ~ Trt_code)
 htemmeans
 plot(htemmeans, comparisons=T) # ctrls > trts
 ```
+*Best Model:*
+Corn_ht_av ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+         Sum Sq Mean Sq NumDF  DenDF F value    Pr(>F)    
+Trt_code 4101.5  585.92     7 222.97  8.3227 5.037e-09 ***
+
+*Assumptions:*
+Good
+
+*Means:*
+ Trt_code emmean   SE   df lower.CL upper.CL
+ E1W1N      46.1 9.85 3.61     17.6     74.7
+ E2W1N      45.7 9.85 3.61     17.1     74.2
+ E3W1N      45.6 9.85 3.61     17.0     74.1
+ S1W1N      45.9 9.84 3.59     17.3     74.5
+ S2W1N      46.5 9.84 3.59     17.9     75.1
+ S3W1N      47.8 9.84 3.59     19.2     76.4
+ W1N        55.1 9.84 3.60     26.5     83.7
+ WF1N       56.0 9.84 3.59     27.5     84.6
+
+*Contrasts:*
+ contrast      estimate   SE  df t.ratio p.value
+ E1W1N - E2W1N    0.439 2.24 218  0.196  1.0000 
+ E1W1N - E3W1N    0.543 2.24 218  0.242  1.0000 
+ E1W1N - S1W1N    0.222 2.18 218  0.102  1.0000 
+ E1W1N - S2W1N   -0.362 2.18 218 -0.166  1.0000 
+ E1W1N - S3W1N   -1.653 2.18 218 -0.759  0.9949 
+ E1W1N - W1N     -8.953 2.20 218 -4.076  0.0016 * 
+ E1W1N - WF1N    -9.909 2.18 218 -4.551  0.0002 
+ E2W1N - E3W1N    0.104 2.24 218  0.046  1.0000 
+ E2W1N - S1W1N   -0.217 2.18 218 -0.100  1.0000 
+ E2W1N - S2W1N   -0.801 2.18 218 -0.368  1.0000 
+ E2W1N - S3W1N   -2.092 2.18 218 -0.961  0.9793 
+ E2W1N - W1N     -9.392 2.20 218 -4.277  0.0007 *
+ E2W1N - WF1N   -10.348 2.18 218 -4.753  0.0001 *
+ E3W1N - S1W1N   -0.321 2.18 218 -0.147  1.0000 
+ E3W1N - S2W1N   -0.905 2.18 218 -0.416  0.9999 
+ E3W1N - S3W1N   -2.196 2.18 218 -1.008  0.9728 
+ E3W1N - W1N     -9.496 2.20 218 -4.324  0.0006 *
+ E3W1N - WF1N   -10.452 2.18 218 -4.800  0.0001 *
+ S1W1N - S2W1N   -0.584 2.10 218 -0.279  1.0000 
+ S1W1N - S3W1N   -1.875 2.10 218 -0.894  0.9864 
+ S1W1N - W1N     -9.175 2.12 218 -4.337  0.0006 *
+ S1W1N - WF1N   -10.131 2.10 218 -4.830  0.0001 *
+ S2W1N - S3W1N   -1.291 2.10 218 -0.615  0.9986 
+ S2W1N - W1N     -8.591 2.12 218 -4.061  0.0017 *
+ S2W1N - WF1N    -9.547 2.10 218 -4.551  0.0002 *
+ S3W1N - W1N     -7.300 2.12 218 -3.451  0.0152 *
+ S3W1N - WF1N    -8.256 2.10 218 -3.936  0.0028 *
+ W1N - WF1N      -0.956 2.12 218 -0.452  0.9998 
+
 
 ```{r corn ht analysis -- trts}
 # trt effect
@@ -812,10 +1077,19 @@ qqnorm(resid.model.httrt) # messy on ends
 shapiro.test(resid.model.httrt)
 
 # means
-htemmeans1<- emmeans(model.ht.trt.best, pairwise ~ Location)
-htemmeans1
-plot(htemmeans1, comparisons=T) # Harrow > Agassiz > StJean
 ```
+*Best Model:*
+Corn_ht_av ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Good
+
+*Means:*
+None
+
 
 ```{r corn ht analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
@@ -825,7 +1099,7 @@ anova(model.htw)
 
 model.htw.best<- get_model(lmerTest::step(model.htw, reduce.random=F))
 summary(model.htw.best)
-Anova(model.htw.best, type="III")
+anova(model.htw.best)
 
 # check residuals
 resid.model.htw<- resid(model.htw.best)
@@ -849,6 +1123,25 @@ plot(htwemmeans, comparisons=T)
 
 # W > WF
 ```
+*Best Model:*
+Corn_ht_av ~ Weediness + (1 | Year/Rep)
+
+*Effects:*
+          Sum Sq Mean Sq NumDF DenDF F value   Pr(>F)   
+Weediness 102.09  102.09     1    87  8.4947 0.004528 **
+
+*Assumptions:*
+Fine
+
+*Means:*
+ Weediness emmean   SE   df lower.CL upper.CL
+ W           61.8 5.92 1.01    -12.2      136
+ WF          59.7 5.92 1.01    -14.3      134
+
+*Contrasts:*
+ contrast estimate    SE df t.ratio p.value
+ W - WF       2.06 0.708 87 2.915   0.0045 *
+
 
 ```{r corn ht analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
@@ -858,17 +1151,17 @@ anova(model.htw600)
 
 model.htw600.best<- get_model(lmerTest::step(model.htw600, reduce.random=F))
 summary(model.htw600.best)
-Anova(model.htw600.best, type="III")
+anova(model.htw600.best)
 
 # check residuals
 resid.model.htw600<- resid(model.htw600.best)
 pred.model.htw600<- predict(model.htw600.best)
 
 # check randomness
-plot(pred.model.htw600, resid.model.htw600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals") 
+plot(pred.model.htw600, resid.model.htw600, ylab="Residuals", xlab="Corn ht", main="Predictecd vs Residuals") 
 
 # check normality
-hist(resid.model.htw600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.htw600, main="Histogram of Residuals", xlab="Corn ht")
 
 qqnorm(resid.model.htw600)
 
@@ -876,16 +1169,31 @@ qqnorm(resid.model.htw600)
 shapiro.test(resid.model.htw600)
 
 # means
-htw600emmeans<- emmeans(model.htw600.best, pairwise ~ Location)
+htw600emmeans<- emmeans(model.htw600.best, pairwise ~ Cult)
 htw600emmeans
-plot(htw600emmeans, comparisons=T) # Harrow > StJean
-
-htw600emmeans1<- emmeans(model.htw600.best, pairwise ~ Cult)
-htw600emmeans1
-plot(htw600emmeans1, comparisons=T)
+plot(htw600emmeans, comparisons=T)
 
 # no weediness effect
 ```
+*Best Model:*
+Corn_ht_av ~ Cult + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+     Sum Sq Mean Sq NumDF  DenDF F value  Pr(>F)  
+Cult 96.617  96.617     1 39.389  5.4598 0.02464 *
+
+*Assumptions:*
+Not great -- hist not bell curve
+
+*Means:*
+ Cult     emmean   SE   df lower.CL upper.CL
+ Early      42.2 17.3 1.25    -96.6      181
+ Standard   45.0 17.3 1.25    -93.7      184
+
+*Contrasts:*
+ contrast         estimate   SE   df t.ratio p.value
+ Early - Standard    -2.84 1.21 36.5 -2.337  0.0251 *
+
 
 ```{r corn ht analysis -- w vs wf trts, S 600}
 # test effect of w/wf trt -> S, 600
@@ -895,17 +1203,17 @@ anova(model.htws)
 
 model.htws.best<- get_model(lmerTest::step(model.htws, reduce.random=F))
 summary(model.htws.best)
-Anova(model.htws.best, type="III")
+anova(model.htws.best)
 
 # check residuals
 resid.model.htws<- resid(model.htws.best)
 pred.model.htws<- predict(model.htws.best)
 
 # check randomness
-plot(pred.model.htws, resid.model.htws, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.htws, resid.model.htws, ylab="Residuals", xlab="Corn ht", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.htws, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.htws, main="Histogram of Residuals", xlab="Corn ht")
 
 qqnorm(resid.model.htws)
 
@@ -916,26 +1224,38 @@ shapiro.test(resid.model.htws)
 
 # no effect of weediness
 ```
+*Best Model:*
+Corn_ht_av ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Not great -- not a lot of data
+
+*Means:*
+None
+
 
 ```{r corn ht analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
-model.htwf<- lmer(Corn_ht_av ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=Hdatwf)
+model.htwf<- lmer(Corn_ht_av ~ Trt_code + (1 | Year / Rep), data=Hdatwf)
 summary(model.htwf)
 anova(model.htwf)
 
 model.htwf.best<- get_model(lmerTest::step(model.htwf, reduce.random=F))
 summary(model.htwf.best)
-Anova(model.htwf.best, type="III")
+anova(model.htwf.best)
 
 # check residuals
 resid.model.htwf<- resid(model.htwf.best)
 pred.model.htwf<- predict(model.htwf.best)
 
 # check randomness
-plot(pred.model.htwf, resid.model.htwf, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.htwf, resid.model.htwf, ylab="Residuals", xlab="Corn ht", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.htwf, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.htwf, main="Histogram of Residuals", xlab="Corn ht")
 
 qqnorm(resid.model.htwf) 
 
@@ -944,6 +1264,18 @@ shapiro.test(resid.model.htwf)
 
 # no main effects -> WF no rye not diff than trts
 ```
+*Best Model:*
+Corn_ht_av ~ (1 | Year/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Fine
+
+*Means:*
+None
+
 
 ```{r corn ht analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
@@ -953,17 +1285,17 @@ anova(model.htwf600)
 
 model.htwf600.best<- get_model(lmerTest::step(model.htwf600, reduce.random=F))
 summary(model.htwf600.best)
-Anova(model.htwf600.best, type="III")
+anova(model.htwf600.best)
 
 # check residuals
 resid.model.htwf600<- resid(model.htwf600.best)
 pred.model.htwf600<- predict(model.htwf600.best)
 
 # check randomness
-plot(pred.model.htwf600, resid.model.htwf600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.htwf600, resid.model.htwf600, ylab="Residuals", xlab="Corn ht", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.htwf600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.htwf600, main="Histogram of Residuals", xlab="Corn ht")
 
 qqnorm(resid.model.htwf600) 
 
@@ -971,10 +1303,32 @@ qqnorm(resid.model.htwf600)
 shapiro.test(resid.model.htwf600)
 
 # means
-htwf600emmeans<- emmeans(model.htwf600.best, pairwise ~ Location*Trt_code)
+htwf600emmeans<- emmeans(model.htwf600.best, pairwise ~ Trt_code)
 htwf600emmeans
 plot(htwf600emmeans, comparisons=T) # 
 ```
+*Best Model:*
+Corn_ht_av ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+         Sum Sq Mean Sq NumDF DenDF F value    Pr(>F)    
+Trt_code   2175  1087.5     2 30.72  13.491 6.235e-05 ***
+
+*Assumptions:*
+Fine
+
+*Means:*
+ Trt_code emmean SE   df lower.CL upper.CL
+ E3WF1N     44.0 10 1.23    -39.2      127
+ S3WF1N     48.3 10 1.23    -34.8      132
+ WF1N       62.2 10 1.23    -21.0      145
+ 
+*Contrasts:*
+ contrast        estimate   SE   df t.ratio p.value
+ E3WF1N - S3WF1N    -4.34 3.67 24.3 -1.185  0.4734 
+ E3WF1N - WF1N     -18.23 3.67 24.3 -4.972  0.0001 *
+ S3WF1N - WF1N     -13.88 3.67 24.3 -3.788  0.0025 *
+
 
 ```{r corn ht analysis -- wf trt vs ctrl, S 600}
 # test effect of trts
@@ -984,17 +1338,17 @@ anova(model.htwfs)
 
 model.htwfs.best<- get_model(lmerTest::step(model.htwfs, reduce.random=F))
 summary(model.htwfs.best)
-Anova(model.htwfs.best, type="III")
+anova(model.htwfs.best)
 
 # check residuals
 resid.model.htwfs<- resid(model.htwfs.best)
 pred.model.htwfs<- predict(model.htwfs.best)
 
 # check randomness
-plot(pred.model.htwfs, resid.model.htwfs, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.htwfs, resid.model.htwfs, ylab="Residuals", xlab="Corn ht", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.htwfs, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.htwfs, main="Histogram of Residuals", xlab="Corn ht")
 
 qqnorm(resid.model.htwfs) 
 
@@ -1002,11 +1356,20 @@ qqnorm(resid.model.htwfs)
 shapiro.test(resid.model.htwfs)
 
 # means
-htwfsemmeans<- emmeans(model.htwfs.best, pairwise ~ Location)
-htwf600emmeans
-plot(htwfsemmeans, comparisons=T) # Harrow > StJean
 ```
+*Best Model:*
+Corn_ht_av ~ (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+Fine -- not a lot of data
+
+*Means:*
+None
+ 
+ 
 ```{r corn ht analysis -- wf trts, E & S all SR}
 # test effect of trts
 model.htwftrt<- lmer(Corn_ht_av ~ Cult * SR + (1 | Year / Rep), data=Hdatwftrt)
@@ -1015,17 +1378,17 @@ anova(model.htwftrt)
 
 model.htwftrt.best<- get_model(lmerTest::step(model.htwftrt, reduce.random=F))
 summary(model.htwftrt.best)
-Anova(model.htwftrt.best, type="III")
+anova(model.htwftrt.best)
 
 # check residuals
 resid.model.htwftrt<- resid(model.htwftrt.best)
 pred.model.htwftrt<- predict(model.htwftrt.best)
 
 # check randomness
-plot(pred.model.htwftrt, resid.model.htwftrt, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.htwftrt, resid.model.htwftrt, ylab="Residuals", xlab="Corn ht", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.htwftrt, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.htwftrt, main="Histogram of Residuals", xlab="Corn ht")
 
 qqnorm(resid.model.htwftrt) 
 
@@ -1034,6 +1397,18 @@ shapiro.test(resid.model.htwftrt)
 
 # no main effects
 ```
+*Best Model:*
+Corn_ht_av ~ (1 | Year/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Fine -- slightly left skewed
+
+*Means:*
+None
+
 
 ```{r corn ht analysis -- wf trts, E & S 600}
 # test effect of trts
@@ -1043,17 +1418,17 @@ anova(model.htwftrt600)
 
 model.htwftrt600.best<- get_model(lmerTest::step(model.htwftrt600, reduce.random=F))
 summary(model.htwftrt600.best)
-Anova(model.htwftrt600.best, type="III")
+anova(model.htwftrt600.best)
 
 # check residuals
 resid.model.htwftrt600<- resid(model.htwftrt600.best)
 pred.model.htwftrt600<- predict(model.htwftrt600.best)
 
 # check randomness
-plot(pred.model.htwftrt600, resid.model.htwftrt600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.htwftrt600, resid.model.htwftrt600, ylab="Residuals", xlab="Corn ht", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.htwftrt600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.htwftrt600, main="Histogram of Residuals", xlab="Corn ht")
 
 qqnorm(resid.model.htwftrt600) 
 
@@ -1061,10 +1436,29 @@ qqnorm(resid.model.htwftrt600)
 shapiro.test(resid.model.htwftrt600)
 
 # means
-htwftrt600emmeans<- emmeans(model.htwftrt600.best, pairwise ~ Cult * Location)
+htwftrt600emmeans<- emmeans(model.htwftrt600.best, pairwise ~ Cult)
 htwftrt600emmeans
 plot(htwftrt600emmeans, comparisons=T) # Harrow S = Harrow E > S StJean > E StJean
 ```
+*Best Model:*
+Corn_ht_av ~ Cult + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+     Sum Sq Mean Sq NumDF  DenDF F value  Pr(>F)  
+Cult  113.1   113.1     1 10.704  8.7856 0.01324 *
+
+*Assumptions:*
+Not great -- hist square-like
+
+*Means:*
+ Cult     emmean   SE   df lower.CL upper.CL
+ Early      41.3 15.7 1.15     -105      188
+ Standard   45.6 15.7 1.15     -101      192
+ 
+*Contrasts:*
+ contrast         estimate   SE   df t.ratio p.value
+ Early - Standard    -4.34 1.46 11.9 -2.964  0.0120 *
+
 
 
 ### Marketable corn count
@@ -1112,6 +1506,58 @@ Mcountemmeans<- emmeans(model.M.best, pairwise ~ Trt_code)
 Mcountemmeans
 plot(Mcountemmeans, comparisons=T) # WF > trts & W (W slightly lower than trts, not signif)
 ```
+*Best Model:*
+M_count ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+         Sum Sq Mean Sq NumDF  DenDF F value    Pr(>F)    
+Trt_code 6034.7   862.1     7 159.79  13.264 1.994e-13 ***
+
+*Assumptions:*
+Fine -- possible outlier but important data point
+
+*Means:*
+ Trt_code emmean   SE   df lower.CL upper.CL
+ E1W1N      6.59 5.37 4.30    -7.93     21.1
+ E2W1N      9.16 5.37 4.30    -5.36     23.7
+ E3W1N      7.91 5.37 4.30    -6.61     22.4
+ S1W1N      7.54 5.31 4.12    -7.05     22.1
+ S2W1N      8.14 5.31 4.12    -6.45     22.7
+ S3W1N      9.63 5.31 4.12    -4.96     24.2
+ W1N        3.83 5.31 4.12   -10.75     18.4
+ WF1N      23.82 5.31 4.12     9.24     38.4
+
+*Contrasts:*
+ contrast      estimate   SE  df t.ratio p.value
+ E1W1N - E2W1N   -2.570 2.55 156 -1.008  0.9727 
+ E1W1N - E3W1N   -1.320 2.55 156 -0.518  0.9996 
+ E1W1N - S1W1N   -0.945 2.45 156 -0.385  0.9999 
+ E1W1N - S2W1N   -1.545 2.45 156 -0.629  0.9984 
+ E1W1N - S3W1N   -3.036 2.45 156 -1.237  0.9196 
+ E1W1N - W1N      2.759 2.45 156  1.124  0.9506 
+ E1W1N - WF1N   -17.228 2.45 156 -7.018  <.0001 *
+ E2W1N - E3W1N    1.250 2.55 156  0.490  0.9997 
+ E2W1N - S1W1N    1.625 2.45 156  0.662  0.9978 
+ E2W1N - S2W1N    1.025 2.45 156  0.418  0.9999 
+ E2W1N - S3W1N   -0.466 2.45 156 -0.190  1.0000 
+ E2W1N - W1N      5.329 2.45 156  2.171  0.3750 
+ E2W1N - WF1N   -14.658 2.45 156 -5.971  <.0001 *
+ E3W1N - S1W1N    0.375 2.45 156  0.153  1.0000 
+ E3W1N - S2W1N   -0.225 2.45 156 -0.092  1.0000 
+ E3W1N - S3W1N   -1.716 2.45 156 -0.699  0.9969 
+ E3W1N - W1N      4.079 2.45 156  1.662  0.7116 
+ E3W1N - WF1N   -15.908 2.45 156 -6.481  <.0001 *
+ S1W1N - S2W1N   -0.600 2.33 156 -0.258  1.0000 
+ S1W1N - S3W1N   -2.092 2.33 156 -0.899  0.9858 
+ S1W1N - W1N      3.704 2.33 156  1.592  0.7547 
+ S1W1N - WF1N   -16.283 2.33 156 -6.997  <.0001 *
+ S2W1N - S3W1N   -1.492 2.33 156 -0.641  0.9982 
+ S2W1N - W1N      4.304 2.33 156  1.849  0.5875 
+ S2W1N - WF1N   -15.683 2.33 156 -6.739  <.0001 *
+ S3W1N - W1N      5.796 2.33 156  2.490  0.2073 
+ S3W1N - WF1N   -14.192 2.33 156 -6.098  <.0001 *
+ W1N - WF1N     -19.988 2.33 156 -8.588  <.0001 *
+
 
 ```{r M corn count analysis -- trts}
 # model analysis for marketable corn count trts
@@ -1140,10 +1586,19 @@ shapiro.test(resid.model.Mtrt)
 # not great -> few high values
 
 # means
-Mcountemmeans1<- emmeans(model.M.best, pairwise ~ Location)
-Mcountemmeans1
-plot(Mcountemmeans1, comparisons=T) # Harrow > Agassiz & StJean
 ```
+*Best Model:*
+M_count ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Right skewed
+
+*Means:*
+None
+
 
 ```{r M corn count analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
@@ -1153,17 +1608,17 @@ anova(model.Mw)
 
 model.Mw.best<- get_model(lmerTest::step(model.Mw, reduce.random=F))
 summary(model.Mw.best)
-Anova(model.Mw.best, type="III")
+anova(model.Mw.best)
 
 # check residuals
 resid.model.Mw<- resid(model.Mw.best)
 pred.model.Mw<- predict(model.Mw.best)
 
 # check randomness
-plot(pred.model.Mw, resid.model.Mw, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mw, resid.model.Mw, ylab="Residuals", xlab="Marketable cob count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mw, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mw, main="Histogram of Residuals", xlab="Marketable cob count")
 
 qqnorm(resid.model.Mw)
 
@@ -1177,6 +1632,25 @@ plot(Mwemmeans, comparisons=T)
 
 # WF > W
 ```
+*Best Model:*
+M_count ~ Weediness + (1 | Year/Rep)
+
+*Effects:*
+          Sum Sq Mean Sq NumDF DenDF F value    Pr(>F)    
+Weediness 5460.2  5460.2     1    93  83.481 1.371e-14 ***
+
+*Assumptions:*
+Mostly mid-level data
+
+*Means:*
+ Weediness emmean   SE   df lower.CL upper.CL
+ W             16 8.81 1.02    -91.5      123
+ WF            31 8.81 1.02    -76.4      138
+ 
+ *Contrasts:*
+  contrast estimate   SE df t.ratio p.value
+ W - WF      -15.1 1.65 87 -9.137  <.0001 *
+
 
 ```{r Mcorn count analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
@@ -1186,17 +1660,17 @@ anova(model.Mw600)
 
 model.Mw600.best<- get_model(lmerTest::step(model.Mw600, reduce.random=F))
 summary(model.Mw600.best)
-Anova(model.Mw600.best, type="III")
+anova(model.Mw600.best)
 
 # check residuals
 resid.model.Mw600<- resid(model.Mw600.best)
 pred.model.Mw600<- predict(model.Mw600.best)
 
 # check randomness
-plot(pred.model.Mw600, resid.model.Mw600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals") 
+plot(pred.model.Mw600, resid.model.Mw600, ylab="Residuals", xlab="Marketable cob count", main="Predictecd vs Residuals") 
 
 # check normality
-hist(resid.model.Mw600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mw600, main="Histogram of Residuals", xlab="Marketable cob count")
 
 qqnorm(resid.model.Mw600)
 
@@ -1204,33 +1678,49 @@ qqnorm(resid.model.Mw600)
 shapiro.test(resid.model.Mw600)
 
 # means
-Mw600emmeans<- emmeans(model.Mw600.best, pairwise ~ Location:Weediness)
+Mw600emmeans<- emmeans(model.Mw600.best, pairwise ~ Weediness)
 Mw600emmeans
-plot(Mw600emmeans, comparisons=T) # Harrow > StJean
-
-# weediness effect by location:
-## Harrow: WF > W, StJean: W > WF
+plot(Mw600emmeans, comparisons=T) #
 ```
+*Best Model:*
+M_count ~ Weediness + (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+          Sum Sq Mean Sq NumDF  DenDF F value   Pr(>F)    
+Weediness 1510.9  1510.9     1 43.935  20.193 5.04e-05 ***
+
+*Assumptions:*
+Not bad
+
+*Means:*
+ Weediness emmean   SE   df lower.CL upper.CL
+ W           10.2 12.2 1.98    -43.0     63.3
+ WF          21.4 12.2 1.98    -31.7     74.6
+ 
+ *Contrasts:*
+ contrast estimate  SE   df t.ratio p.value
+ W - WF      -11.2 2.5 37.2 -4.494  0.0001 *
+ 
+ 
 ```{r M corn count analysis -- w vs wf trts, S 600}
-# test effect of w/wf trt -> StJean S, 600
+# test effect of w/wf trt -> StJean & Harrow S, 600
 model.Mws<- lmer(M_count ~ Weediness + (1 | Year / Rep) + (1 | Location / Rep), data=datw2)
 summary(model.Mws)
 anova(model.Mws)
 
 model.Mws.best<- get_model(lmerTest::step(model.Mws, reduce.random=F))
 summary(model.Mws.best)
-Anova(model.Mws.best, type="III")
+anova(model.Mws.best)
 
 # check residuals
 resid.model.Mws<- resid(model.Mws.best)
 pred.model.Mws<- predict(model.Mws.best)
 
 # check randomness
-plot(pred.model.Mws, resid.model.Mws, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mws, resid.model.Mws, ylab="Residuals", xlab="Marketable cob count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mws, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mws, main="Histogram of Residuals", xlab="Marketable cob count")
 
 qqnorm(resid.model.Mws)
 
@@ -1238,30 +1728,49 @@ qqnorm(resid.model.Mws)
 shapiro.test(resid.model.Mws)
 
 # means
-Mwsemmeans<- emmeans(model.Mws.best, pairwise ~ Location*Weediness)
+Mwsemmeans<- emmeans(model.Mws.best, pairwise ~ Weediness)
 Mwsemmeans
 plot(Mwsemmeans, comparisons=T) # Harrow WF > StJean W & WF & Harrow W
 ```
+*Best Model:*
+M_count ~ Weediness + (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+          Sum Sq Mean Sq NumDF  DenDF F value Pr(>F)  
+Weediness 477.04  477.04     1 20.157  6.6321  0.018 *
+
+*Assumptions:*
+Not great distribution of residuals but not horrible
+
+*Means:*
+ Weediness emmean   SE   df lower.CL upper.CL
+ W           15.4 11.9 1.33    -70.9      102
+ WF          24.4 11.9 1.33    -62.0      111
+ 
+ *Contrasts:*
+ contrast estimate   SE   df t.ratio p.value
+ W - WF      -8.92 3.46 13.2 -2.575  0.0228 *
+ 
+ 
 ```{r M corn count analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
-model.Mwf<- lmer(M_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=Hdatwf)
+model.Mwf<- lmer(M_count ~ Trt_code + (1 | Year / Rep), data=Hdatwf)
 summary(model.Mwf)
 anova(model.Mwf)
 
 model.Mwf.best<- get_model(lmerTest::step(model.Mwf, reduce.random=F))
 summary(model.Mwf.best)
-Anova(model.Mwf.best, type="III")
+anova(model.Mwf.best)
 
 # check residuals
 resid.model.Mwf<- resid(model.Mwf.best)
 pred.model.Mwf<- predict(model.Mwf.best)
 
 # check randomness
-plot(pred.model.Mwf, resid.model.Mwf, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwf, resid.model.Mwf, ylab="Residuals", xlab="Marketable cob count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mwf, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwf, main="Histogram of Residuals", xlab="Marketable cob count")
 
 qqnorm(resid.model.Mwf) 
 
@@ -1273,7 +1782,51 @@ Mwfemmeans<- emmeans(model.Mwf.best, pairwise ~ Trt_code)
 Mwfemmeans
 plot(Mwfemmeans, comparisons=T) # 
 ```
+*Best Model:*
+M_count ~ Trt_code + (1 | Year/Rep)
 
+*Effects:*
+         Sum Sq Mean Sq NumDF DenDF F value  Pr(>F)  
+Trt_code 461.43  76.905     6    42  2.8657 0.01973 *
+
+*Assumptions:*
+Good -- one lower outlier but important data point
+
+*Means:*
+ Trt_code emmean   SE  df lower.CL upper.CL
+ E1WF1N     30.9 2.96 2.2     19.2     42.6
+ E2WF1N     33.0 2.96 2.2     21.3     44.7
+ E3WF1N     35.1 2.96 2.2     23.4     46.8
+ S1WF1N     26.0 2.96 2.2     14.3     37.7
+ S2WF1N     29.9 2.96 2.2     18.2     41.6
+ S3WF1N     31.4 2.96 2.2     19.7     43.1
+ WF1N       34.5 2.96 2.2     22.8     46.2
+ 
+ *Contrasts:*
+ contrast        estimate   SE df t.ratio p.value
+ E1WF1N - E2WF1N   -2.125 2.59 42 -0.820  0.9815 
+ E1WF1N - E3WF1N   -4.250 2.59 42 -1.641  0.6575 
+ E1WF1N - S1WF1N    4.875 2.59 42  1.882  0.5029 
+ E1WF1N - S2WF1N    1.000 2.59 42  0.386  0.9997 
+ E1WF1N - S3WF1N   -0.500 2.59 42 -0.193  1.0000 
+ E1WF1N - WF1N     -3.625 2.59 42 -1.400  0.7990 
+ E2WF1N - E3WF1N   -2.125 2.59 42 -0.820  0.9815 
+ E2WF1N - S1WF1N    7.000 2.59 42  2.702  0.1228 
+ E2WF1N - S2WF1N    3.125 2.59 42  1.206  0.8877 
+ E2WF1N - S3WF1N    1.625 2.59 42  0.627  0.9955 
+ E2WF1N - WF1N     -1.500 2.59 42 -0.579  0.9971 
+ E3WF1N - S1WF1N    9.125 2.59 42  3.523  0.0167 *
+ E3WF1N - S2WF1N    5.250 2.59 42  2.027  0.4138 
+ E3WF1N - S3WF1N    3.750 2.59 42  1.448  0.7729 
+ E3WF1N - WF1N      0.625 2.59 42  0.241  1.0000 
+ S1WF1N - S2WF1N   -3.875 2.59 42 -1.496  0.7455 
+ S1WF1N - S3WF1N   -5.375 2.59 42 -2.075  0.3856 
+ S1WF1N - WF1N     -8.500 2.59 42 -3.282  0.0314 *
+ S2WF1N - S3WF1N   -1.500 2.59 42 -0.579  0.9971 
+ S2WF1N - WF1N     -4.625 2.59 42 -1.786  0.5647 
+ S3WF1N - WF1N     -3.125 2.59 42 -1.206  0.8877
+ 
+ 
 ```{r M corn count analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
 model.Mwf600<- lmer(M_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1)
@@ -1282,17 +1835,17 @@ anova(model.Mwf)
 
 model.Mwf600.best<- get_model(lmerTest::step(model.Mwf600, reduce.random=F))
 summary(model.Mwf600.best)
-Anova(model.Mwf600.best, type="III")
+anova(model.Mwf600.best)
 
 # check residuals
 resid.model.Mwf600<- resid(model.Mwf600.best)
 pred.model.Mwf600<- predict(model.Mwf600.best)
 
 # check randomness
-plot(pred.model.Mwf600, resid.model.Mwf600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwf600, resid.model.Mwf600, ylab="Residuals", xlab="Marketable cob count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mwf600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwf600, main="Histogram of Residuals", xlab="Marketable cob count")
 
 qqnorm(resid.model.Mwf600) 
 
@@ -1304,7 +1857,19 @@ Mwf600emmeans<- emmeans(model.Mwf600.best, pairwise ~ Location)
 Mwf600emmeans
 plot(Mwf600emmeans, comparisons=T) # Harrow > StJean
 ```
+*Best Model:*
+M_count ~ (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+Fine -- not a lot of data
+
+*Means:*
+None
+ 
+ 
 ```{r M corn count analysis -- wf trt vs ctrl, S 600}
 # test effect of trts
 model.Mwfs<- lmer(M_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf2)
@@ -1313,17 +1878,17 @@ anova(model.Mwfs)
 
 model.Mwfs.best<- get_model(lmerTest::step(model.Mwfs, reduce.random=F))
 summary(model.Mwfs.best)
-Anova(model.Mwf.best, type="III")
+anova(model.Mwf.best)
 
 # check residuals
 resid.model.Mwfs<- resid(model.Mwfs.best)
 pred.model.Mwfs<- predict(model.Mwfs.best)
 
 # check randomness
-plot(pred.model.Mwfs, resid.model.Mwfs, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwfs, resid.model.Mwfs, ylab="Residuals", xlab="Marketable cob count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mwfs, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwfs, main="Histogram of Residuals", xlab="Marketable cob count")
 
 qqnorm(resid.model.Mwfs) 
 
@@ -1331,10 +1896,29 @@ qqnorm(resid.model.Mwfs)
 shapiro.test(resid.model.Mwfs)
 
 # means
-Mwfsemmeans<- emmeans(model.Mwfs.best, pairwise ~ Trt_code*Location)
+Mwfsemmeans<- emmeans(model.Mwfs.best, pairwise ~ Trt_code)
 Mwfsemmeans
 plot(Mwfsemmeans, comparisons=T) # Harrow NR & S > StJean NR > StJean S
 ```
+*Best Model:*
+M_count ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+         Sum Sq Mean Sq NumDF DenDF F value  Pr(>F)  
+Trt_code 461.43  76.905     6    42  2.8657 0.01973 *
+
+*Assumptions:*
+Not great -- not a lot of data
+
+*Means:*
+ Trt_code emmean   SE   df lower.CL upper.CL
+ S3WF1N     18.7 10.5 1.03   -104.8      142
+ WF1N       26.7 10.5 1.03    -96.8      150
+ 
+*Contrasts:*
+ contrast      estimate   SE   df t.ratio p.value
+ S3WF1N - WF1N       -8 2.72 13.3 -2.943  0.0112 *
+
 
 ```{r M corn count analysis -- wf trts, E & S all SR}
 # test effect of trts
@@ -1344,17 +1928,17 @@ anova(model.Mwftrt)
 
 model.Mwftrt.best<- get_model(lmerTest::step(model.Mwftrt, reduce.random=F))
 summary(model.Mwftrt.best)
-Anova(model.Mwftrt.best, type="III")
+anova(model.Mwftrt.best)
 
 # check residuals
 resid.model.Mwftrt<- resid(model.Mwftrt.best)
 pred.model.Mwftrt<- predict(model.Mwftrt.best)
 
 # check randomness
-plot(pred.model.Mwftrt, resid.model.Mwftrt, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwftrt, resid.model.Mwftrt, ylab="Residuals", xlab="Marketable cob count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mwftrt, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwftrt, main="Histogram of Residuals", xlab="Marketable cob count")
 
 qqnorm(resid.model.Mwftrt) 
 
@@ -1370,7 +1954,37 @@ Mwftrtemmeans1<- emmeans(model.Mwftrt.best, pairwise ~ SR)
 Mwftrtemmeans1
 plot(Mwftrtemmeans1, comparisons=T) # 600 > 150
 ```
+*Best Model:*
+M_count ~ Cult + SR + (1 | Year/Rep)
 
+*Effects:*
+     Sum Sq Mean Sq NumDF DenDF F value   Pr(>F)   
+Cult 184.08 184.083     1    37  8.3722 0.006352 **
+SR   189.04  94.521     2    37  4.2988 0.020955 * 
+
+*Assumptions:*
+Not great -- not a lot of data
+
+*Means:*
+ Cult     emmean   SE  df lower.CL upper.CL
+ Early      33.0 3.12 1.1     1.06     64.9
+ Standard   29.1 3.12 1.1    -2.86     61.0
+ 
+ SR  emmean   SE   df lower.CL upper.CL
+ 150   28.4 3.19 1.21     1.18     55.7
+ 300   31.4 3.19 1.21     4.18     58.7
+ 600   33.2 3.19 1.21     5.99     60.5
+ 
+*Contrasts:*
+ contrast         estimate   SE df t.ratio p.value
+ Early - Standard     3.92 1.35 37 2.893   0.0064 *
+
+ contrast  estimate   SE df t.ratio p.value
+ 150 - 300    -3.00 1.66 37 -1.810  0.1805 
+ 150 - 600    -4.81 1.66 37 -2.903  0.0167 *
+ 300 - 600    -1.81 1.66 37 -1.093  0.5242 
+ 
+ 
 ```{r M corn count analysis -- wf trts, E & S 600}
 # test effect of trts
 model.Mwftrt600<- lmer(M_count ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1)
@@ -1379,17 +1993,17 @@ anova(model.Mwftrt600)
 
 model.Mwftrt600.best<- get_model(lmerTest::step(model.Mwftrt600, reduce.random=F))
 summary(model.Mwftrt600.best)
-Anova(model.Mwftrt600.best, type="III")
+anova(model.Mwftrt600.best)
 
 # check residuals
 resid.model.Mwftrt600<- resid(model.Mwftrt600.best)
 pred.model.Mwftrt600<- predict(model.Mwftrt600.best)
 
 # check randomness
-plot(pred.model.Mwftrt600, resid.model.Mwftrt600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwftrt600, resid.model.Mwftrt600, ylab="Residuals", xlab="Marketable cob count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mwftrt600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwftrt600, main="Histogram of Residuals", xlab="Marketable cob count")
 
 qqnorm(resid.model.Mwftrt600) 
 
@@ -1397,10 +2011,18 @@ qqnorm(resid.model.Mwftrt600)
 shapiro.test(resid.model.Mwftrt600)
 
 # means
-Mwftrt600emmeans<- emmeans(model.Mwftrt600.best, pairwise ~ Location)
-Mwftrt600emmeans
-plot(Mwftrt600emmeans, comparisons=T) # Harrow > StJean
 ```
+*Best Model:*
+M_count ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Okay
+
+*Means:*
+None
 
 
 ### Marketable corn weight
@@ -1444,6 +2066,58 @@ Mwtemmeans<- emmeans(model.Mwt.best, pairwise ~ Trt_code)
 Mwtemmeans
 plot(Mwtemmeans, comparisons=T) # WF > trts & W (W slightly lower than trts, not signif)
 ```
+*Best Model:*
+M_wt ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+            Sum Sq  Mean Sq NumDF  DenDF F value    Pr(>F)    
+Trt_code 584530576 83504368     7 159.67  19.132 < 2.2e-16 ***
+
+*Assumptions:*
+Fine
+
+*Means:*
+ Trt_code emmean   SE   df lower.CL upper.CL
+ E1W1N      1480 1568 4.50    -2689     5648
+ E2W1N      1677 1568 4.50    -2492     5845
+ E3W1N      1663 1568 4.50    -2506     5832
+ S1W1N      1836 1555 4.36    -2344     6017
+ S2W1N      2184 1555 4.36    -1996     6365
+ S3W1N      2672 1555 4.36    -1509     6853
+ W1N         741 1555 4.36    -3440     4921
+ WF1N       6836 1555 4.36     2655    11017
+ 
+*Contrasts:*
+ contrast      estimate  SE  df t.ratio p.value
+ E1W1N - E2W1N   -197.0 661 156  -0.298 1.0000 
+ E1W1N - E3W1N   -183.1 661 156  -0.277 1.0000 
+ E1W1N - S1W1N   -356.7 636 156  -0.561 0.9993 
+ E1W1N - S2W1N   -704.7 636 156  -1.108 0.9543 
+ E1W1N - S3W1N  -1192.1 636 156  -1.874 0.5707 
+ E1W1N - W1N      739.1 636 156   1.162 0.9413 
+ E1W1N - WF1N   -5355.9 636 156  -8.420 <.0001 *
+ E2W1N - E3W1N     13.9 661 156   0.021 1.0000 
+ E2W1N - S1W1N   -159.7 636 156  -0.251 1.0000 
+ E2W1N - S2W1N   -507.7 636 156  -0.798 0.9930 
+ E2W1N - S3W1N   -995.0 636 156  -1.564 0.7706 
+ E2W1N - W1N      936.1 636 156   1.472 0.8213 
+ E2W1N - WF1N   -5158.9 636 156  -8.111 <.0001 *
+ E3W1N - S1W1N   -173.6 636 156  -0.273 1.0000 
+ E3W1N - S2W1N   -521.5 636 156  -0.820 0.9918 
+ E3W1N - S3W1N  -1008.9 636 156  -1.586 0.7579 
+ E3W1N - W1N      922.2 636 156   1.450 0.8323 
+ E3W1N - WF1N   -5172.8 636 156  -8.133 <.0001 *
+ S1W1N - S2W1N   -348.0 603 156  -0.577 0.9991 
+ S1W1N - S3W1N   -835.4 603 156  -1.385 0.8628 
+ S1W1N - W1N     1095.8 603 156   1.817 0.6096 
+ S1W1N - WF1N   -4999.3 603 156  -8.289 <.0001 *
+ S2W1N - S3W1N   -487.4 603 156  -0.808 0.9925 
+ S2W1N - W1N     1443.7 603 156   2.394 0.2517 
+ S2W1N - WF1N   -4651.3 603 156  -7.712 <.0001 *
+ S3W1N - W1N     1931.1 603 156   3.202 0.0345 
+ S3W1N - WF1N   -4163.9 603 156  -6.904 <.0001 *
+ W1N - WF1N     -6095.0 603 156 -10.106 <.0001 *
+
 
 ```{r M corn wt analysis -- trts}
 # model analysis for marketable cob weight trts
@@ -1471,14 +2145,29 @@ qqnorm(resid.model.Mwttrt) #
 shapiro.test(resid.model.Mwttrt)
 
 # means
-Mwtemmeans1<- emmeans(model.Mwt.trt.best, pairwise ~ Cult)
-Mwtemmeans1
-plot(Mwtemmeans1, comparisons=T) # Std > Early
-
-Mwtemmeans2<- emmeans(model.Mwt.trt.best, pairwise ~ Location)
-Mwtemmeans2
-plot(Mwtemmeans2, comparison=T) # Harrow > Agassiz & StJean
+Mwtemmeans<- emmeans(model.Mwt.trt.best, pairwise ~ Cult)
+Mwtemmeans
+plot(Mwtemmeans, comparisons=T) # Std > Early
 ```
+*Best Model:*
+M_wt ~ Cult + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+       Sum Sq  Mean Sq NumDF DenDF F value   Pr(>F)   
+Cult 19352817 19352817     1 117.9  7.7698 0.006194 **
+
+*Assumptions:*
+Good
+
+*Means:*
+ Cult     emmean   SE   df lower.CL upper.CL
+ Early      1466 1912 3.49    -4159     7091
+ Standard   2253 1909 3.48    -3378     7885
+
+*Contrasts:*
+ contrast         estimate  SE  df t.ratio p.value
+ Early - Standard     -787 283 114 -2.784  0.0063 *
+
 
 ```{r M corn wt analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
@@ -1488,17 +2177,17 @@ anova(model.Mwtw)
 
 model.Mwtw.best<- get_model(lmerTest::step(model.Mwtw, reduce.random=F))
 summary(model.Mwtw.best)
-Anova(model.Mwtw.best, type="III")
+anova(model.Mwtw.best)
 
 # check residuals
 resid.model.Mwtw<- resid(model.Mwtw.best)
 pred.model.Mwtw<- predict(model.Mwtw.best)
 
 # check randomness
-plot(pred.model.Mwtw, resid.model.Mwtw, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwtw, resid.model.Mwtw, ylab="Residuals", xlab="M cob wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mwtw, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwtw, main="Histogram of Residuals", xlab="M cob wt")
 
 qqnorm(resid.model.Mwtw)
 
@@ -1515,7 +2204,35 @@ plot(Mwtwemmeans, comparisons=T)
 ## Early: WF > W
 ## W Early = W Std, WF Early = WF
 ```
+*Best Model:*
+M_wt ~ Weediness + Cult + (1 | Year/Rep) + Weediness:Cult
 
+*Effects:*
+                  Sum Sq   Mean Sq NumDF DenDF  F value  Pr(>F)    
+Weediness      451838728 451838728     1    91 105.7620 < 2e-16 ***
+Cult                 221       221     1    91   0.0001 0.99428    
+Weediness:Cult  18583752  18583752     1    91   4.3499 0.03981 * 
+
+*Assumptions:*
+Not great -- not enough data
+
+*Means:*
+ Weediness Cult     emmean   SE   df lower.CL upper.CL
+ W         Early      3727 2674 1.04   -27424    34879
+ WF        Early      8946 2674 1.04   -22205    40097
+ W         Standard   4610 2674 1.04   -26541    35761
+ WF        Standard   8069 2674 1.04   -23082    39220
+
+*Contrasts:*
+ contrast                 estimate  SE df t.ratio p.value
+ W Early - WF Early          -5219 597 85 -8.747  <.0001 *
+ W Early - W Standard         -883 597 85 -1.480  0.4541 
+ W Early - WF Standard       -4342 597 85 -7.277  <.0001 *
+ WF Early - W Standard        4336 597 85  7.267  <.0001 *
+ WF Early - WF Standard        877 597 85  1.470  0.4602 
+ W Standard - WF Standard    -3459 597 85 -5.797  <.0001 *
+ 
+ 
 ```{r M corn wt analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
 model.Mwtw600<- lmer(M_wt ~ Weediness * Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datw1)
@@ -1524,17 +2241,17 @@ anova(model.Mwtw600)
 
 model.Mwtw600.best<- get_model(lmerTest::step(model.Mwtw600, reduce.random=F))
 summary(model.Mwtw600.best)
-Anova(model.Mwtw600.best, type="III")
+anova(model.Mwtw600.best)
 
 # check residuals
 resid.model.Mwtw600<- resid(model.Mwtw600.best)
 pred.model.Mwtw600<- predict(model.Mwtw600.best)
 
 # check randomness
-plot(pred.model.Mwtw600, resid.model.Mwtw600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals") 
+plot(pred.model.Mwtw600, resid.model.Mwtw600, ylab="Residuals", xlab="M cob wt", main="Predictecd vs Residuals") 
 
 # check normality
-hist(resid.model.Mwtw600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwtw600, main="Histogram of Residuals", xlab="M cob wt")
 
 qqnorm(resid.model.Mwtw600)
 
@@ -1542,14 +2259,33 @@ qqnorm(resid.model.Mwtw600)
 shapiro.test(resid.model.Mwtw600)
 
 # means
-Mwtw600emmeans<- emmeans(model.Mwtw600.best, pairwise ~ Location:Weediness)
+Mwtw600emmeans<- emmeans(model.Mwtw600.best, pairwise ~ Weediness)
 Mwtw600emmeans
 plot(Mwtw600emmeans, comparisons=T) 
 
 # weediness effect by location:
 ## Harrow: WF > W, StJean: W = WF
 ```
+*Best Model:*
+M_wt ~ Weediness + (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+             Sum Sq   Mean Sq NumDF  DenDF F value    Pr(>F)    
+Weediness 137022539 137022539     1 43.959  25.739 7.579e-06 ***
+
+*Assumptions:*
+Not great -- square-like hist
+
+*Means:*
+ Weediness emmean   SE   df lower.CL upper.CL
+ W           2171 4059 1.97   -15559    19900
+ WF          5550 4059 1.97   -12180    23279
+
+*Contrasts:*
+ contrast estimate  SE   df t.ratio p.value
+ W - WF      -3379 666 37.2 -5.073  <.0001 *
+ 
+ 
 ```{r M corn wt analysis -- w vs wf trts, S 600}
 # test effect of w/wf trt ->  S, 600
 model.Mwtws<- lmer(M_wt ~ Weediness + (1 | Year / Rep) + (1 | Location / Rep), data=datw2)
@@ -1558,28 +2294,48 @@ anova(model.Mwtws)
 
 model.Mwtws.best<- get_model(lmerTest::step(model.Mwtws, reduce.random=F))
 summary(model.Mwtws.best)
-Anova(model.Mwtws.best, type="III")
+anova(model.Mwtws.best)
 
 # check residuals
 resid.model.Mwtws<- resid(model.Mwtws.best)
 pred.model.Mwtws<- predict(model.Mwtws.best)
 
 # check randomness
-plot(pred.model.Mwtws, resid.model.Mwtws, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwtws, resid.model.Mwtws, ylab="Residuals", xlab="M cob wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mws, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mws, main="Histogram of Residuals", xlab="M cob wt")
 
 qqnorm(resid.model.Mwtws)
 
 # Shapiro-Wilk test
 shapiro.test(resid.model.Mwtws)
 
-# no main effects to compare means
-
-# no effect of weediness
+# means
+Mwtwsemmeans<- emmeans(model.Mwtws.best, pairwise ~ Weediness)
+Mwtwsemmeans
+plot(Mwtwsemmeans, comparisons=T)
 ```
+*Best Model:*
+M_wt ~ Weediness + (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+            Sum Sq  Mean Sq NumDF  DenDF F value  Pr(>F)  
+Weediness 32868461 32868461     1 20.103  7.1519 0.01453 *
+
+*Assumptions:*
+Not great -- not enough data
+
+*Means:*
+ Weediness emmean   SE   df lower.CL upper.CL
+ W           4416 3859 1.31   -24321    33152
+ WF          6756 3859 1.31   -21980    35493
+
+*Contrasts:*
+ contrast estimate  SE   df t.ratio p.value
+ W - WF      -2341 875 13.2 -2.674  0.0189 *
+ 
+ 
 ```{r M corn wt analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
 model.Mwtwf<- lmer(M_wt ~ Trt_code + (1 | Year / Rep), data=Hdatwf)
@@ -1588,17 +2344,17 @@ anova(model.Mwtwf)
 
 model.Mwtwf.best<- get_model(lmerTest::step(model.Mwtwf, reduce.random=F))
 summary(model.Mwtwf.best)
-Anova(model.Mwtwf.best, type="III")
+anova(model.Mwtwf.best)
 
 # check residuals
 resid.model.Mwtwf<- resid(model.Mwtwf.best)
 pred.model.Mwtwf<- predict(model.Mwtwf.best)
 
 # check randomness
-plot(pred.model.Mwtwf, resid.model.Mwtwf, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwtwf, resid.model.Mwtwf, ylab="Residuals", xlab="M cob wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mwtwf, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwtwf, main="Histogram of Residuals", xlab="M cob wt")
 
 qqnorm(resid.model.Mwtwf) 
 
@@ -1607,7 +2363,19 @@ shapiro.test(resid.model.Mwtwf)
 
 # no main effects
 ```
+*Best Model:*
+M_wt ~ (1 | Year/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+Not great -- not enough data
+
+*Means:*
+None
+ 
+ 
 ```{r M corn wt analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
 model.Mwt600wf<- lmer(M_wt ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1)
@@ -1616,17 +2384,17 @@ anova(model.Mwt600wf)
 
 model.Mwt600wf.best<- get_model(lmerTest::step(model.Mwt600wf, reduce.random=F))
 summary(model.Mwt600wf.best)
-Anova(model.Mwt600wf.best, type="III")
+anova(model.Mwt600wf.best)
 
 # check residuals
 resid.model.Mwt600wf<- resid(model.Mwt600wf.best)
 pred.model.Mwt600wf<- predict(model.Mwt600wf.best)
 
 # check randomness
-plot(pred.model.Mwt600wf, resid.model.Mwt600wf, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwt600wf, resid.model.Mwt600wf, ylab="Residuals", xlab="M cob wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mwt600wf, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwt600wf, main="Histogram of Residuals", xlab="M cob wt")
 
 qqnorm(resid.model.Mwt600wf) 
 
@@ -1634,10 +2402,19 @@ qqnorm(resid.model.Mwt600wf)
 shapiro.test(resid.model.Mwt600wf)
 
 # means
-Mwt600wfemmeans<- emmeans(model.Mwt600wf.best, pairwise ~ Location)
-Mwt600wfemmeans
-plot(Mwt600wfemmeans, comparisons=T) # Harrow > StJean
 ```
+*Best Model:*
+M_wt ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Not horrible
+
+*Means:*
+None
+
 
 ```{r M corn wt analysis -- wf trt vs ctrl, S 600}
 # test effect of trts
@@ -1647,17 +2424,17 @@ anova(model.Mwtswf)
 
 model.Mwtswf.best<- get_model(lmerTest::step(model.Mwtswf, reduce.random=F))
 summary(model.Mwtswf.best)
-Anova(model.Mwtswf.best, type="III")
+anova(model.Mwtswf.best)
 
 # check residuals
 resid.model.Mwtswf<- resid(model.Mwtswf.best)
 pred.model.Mwtswf<- predict(model.Mwtswf.best)
 
 # check randomness
-plot(pred.model.Mwtswf, resid.model.Mwtswf, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwtswf, resid.model.Mwtswf, ylab="Residuals", xlab="M cob wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mwtswf, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwtswf, main="Histogram of Residuals", xlab="M cob wt")
 
 qqnorm(resid.model.Mwtswf) 
 
@@ -1668,11 +2445,26 @@ shapiro.test(resid.model.Mwtswf)
 Mwtswfemmeans<- emmeans(model.Mwtswf.best, pairwise ~ Trt_code)
 Mwtswfemmeans
 plot(Mwtswfemmeans, comparisons=T) # NR > S
-
-Mwtswfemmeans1<- emmeans(model.Mwtswf.best, pairwise ~ Location)
-Mwtswfemmeans1
-plot(Mwtswfemmeans1, comparisons=T) # Harrow > StJean
 ```
+*Best Model:*
+M_wt ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+           Sum Sq  Mean Sq NumDF  DenDF F value  Pr(>F)  
+Trt_code 19951789 19951789     1 20.147  6.2229 0.02141 *
+
+*Assumptions:*
+Bad -- messy hist of residuals
+
+*Means:*
+ Trt_code emmean   SE   df lower.CL upper.CL
+ S3WF1N     4912 3773 1.05   -37520    47344
+ WF1N       6736 3773 1.05   -35697    49168
+
+*Contrasts:*
+ contrast      estimate  SE   df t.ratio p.value
+ S3WF1N - WF1N    -1824 731 13.2 -2.495  0.0266 *
+
 
 ```{r M corn wt analysis -- wf trts, E & S all SR}
 # test effect of trts
@@ -1682,17 +2474,17 @@ anova(model.Mwtwftrt)
 
 model.Mwtwftrt.best<- get_model(lmerTest::step(model.Mwtwftrt, reduce.random=F))
 summary(model.Mwtwftrt.best)
-Anova(model.Mwtwftrt.best, type="III")
+anova(model.Mwtwftrt.best)
 
 # check residuals
 resid.model.Mwtwftrt<- resid(model.Mwtwftrt.best)
 pred.model.Mwtwftrt<- predict(model.Mwtwftrt.best)
 
 # check randomness
-plot(pred.model.Mwtwftrt, resid.model.Mwtwftrt, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwtwftrt, resid.model.Mwtwftrt, ylab="Residuals", xlab="M cob wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mwtwftrt, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwtwftrt, main="Histogram of Residuals", xlab="M cob wt")
 
 qqnorm(resid.model.Mwtwftrt) 
 
@@ -1701,7 +2493,19 @@ shapiro.test(resid.model.Mwtwftrt)
 
 # no main effects
 ```
+*Best Model:*
+M_wt ~ (1 | Year/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+Not horrible
+
+*Means:*
+None
+ 
+ 
 ```{r M corn wt analysis -- wf trts, E & S 600}
 # test effect of trts
 model.Mwtwftrt600<- lmer(M_wt ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1)
@@ -1710,17 +2514,17 @@ anova(model.Mwtwftrt600)
 
 model.Mwtwftrt600.best<- get_model(lmerTest::step(model.Mwtwftrt600, reduce.random=F))
 summary(model.Mwtwftrt600.best)
-Anova(model.Mwtwftrt600.best, type="III")
+anova(model.Mwtwftrt600.best)
 
 # check residuals
 resid.model.Mwtwftrt600<- resid(model.Mwtwftrt600.best)
 pred.model.Mwtwftrt600<- predict(model.Mwtwftrt600.best)
 
 # check randomness
-plot(pred.model.Mwtwftrt600, resid.model.Mwtwftrt600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.Mwtwftrt600, resid.model.Mwtwftrt600, ylab="Residuals", xlab="M cob wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.Mwtwftrt600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.Mwtwftrt600, main="Histogram of Residuals", xlab="M cob wt")
 
 qqnorm(resid.model.Mwtwftrt600) 
 
@@ -1728,10 +2532,19 @@ qqnorm(resid.model.Mwtwftrt600)
 shapiro.test(resid.model.Mwtwftrt600)
 
 # means
-Mwtwftrt600emmeans<- emmeans(model.Mwtwftrt600.best, pairwise ~ Location)
-Mwtwftrt600emmeans
-plot(Mwtwftrt600emmeans, comparisons=T) # Harrow > StJean
 ```
+*Best Model:*
+M_wt ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Not horrible
+
+*Means:*
+None
+
 
 
 ### Unmarketable corn count
@@ -1775,6 +2588,58 @@ UMcountemmeans<- emmeans(model.UM.best, pairwise ~ Trt_code)
 UMcountemmeans
 plot(UMcountemmeans, comparisons=T) # WF > W, S3 > W, Trts = WF
 ```
+*Best Model:*
+UM_count ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+         Sum Sq Mean Sq NumDF  DenDF F value   Pr(>F)   
+Trt_code 956.19   136.6     7 161.56  3.3927 0.002086 **
+
+*Assumptions:*
+Good
+
+*Means:*
+ Trt_code emmean   SE   df lower.CL upper.CL
+ E1W1N      19.0 5.39 3.13    2.231     35.7
+ E2W1N      19.6 5.39 3.13    2.801     36.3
+ E3W1N      18.6 5.39 3.13    1.881     35.4
+ S1W1N      21.3 5.35 3.05    4.461     38.2
+ S2W1N      21.3 5.35 3.05    4.402     38.2
+ S3W1N      23.6 5.35 3.05    6.702     40.5
+ W1N        17.4 5.35 3.05    0.565     34.3
+ WF1N       24.4 5.35 3.05    7.498     41.3
+
+*Contrasts:*
+ contrast      estimate   SE  df t.ratio p.value
+ E1W1N - E2W1N  -0.5700 2.01 156 -0.284  1.0000 
+ E1W1N - E3W1N   0.3500 2.01 156  0.174  1.0000 
+ E1W1N - S1W1N  -2.3532 1.93 156 -1.218  0.9255 
+ E1W1N - S2W1N  -2.2948 1.93 156 -1.188  0.9343 
+ E1W1N - S3W1N  -4.5949 1.93 156 -2.378  0.2594 
+ E1W1N - W1N     1.5427 1.93 156  0.799  0.9930 
+ E1W1N - WF1N   -5.3907 1.93 156 -2.790  0.1049 
+ E2W1N - E3W1N   0.9200 2.01 156  0.458  0.9998 
+ E2W1N - S1W1N  -1.7832 1.93 156 -0.923  0.9834 
+ E2W1N - S2W1N  -1.7248 1.93 156 -0.893  0.9863 
+ E2W1N - S3W1N  -4.0248 1.93 156 -2.083  0.4303 
+ E2W1N - W1N     2.1126 1.93 156  1.094  0.9573 
+ E2W1N - WF1N   -4.8207 1.93 156 -2.495  0.2052 
+ E3W1N - S1W1N  -2.7032 1.93 156 -1.399  0.8564 
+ E3W1N - S2W1N  -2.6448 1.93 156 -1.369  0.8699 
+ E3W1N - S3W1N  -4.9448 1.93 156 -2.560  0.1790 
+ E3W1N - W1N     1.1926 1.93 156  0.617  0.9986 
+ E3W1N - WF1N   -5.7407 1.93 156 -2.972  0.0659 
+ S1W1N - S2W1N   0.0583 1.83 156  0.032  1.0000 
+ S1W1N - S3W1N  -2.2417 1.83 156 -1.224  0.9237 
+ S1W1N - W1N     3.8958 1.83 156  2.127  0.4025 
+ S1W1N - WF1N   -3.0375 1.83 156 -1.658  0.7139 
+ S2W1N - S3W1N  -2.3000 1.83 156 -1.256  0.9134 
+ S2W1N - W1N     3.8375 1.83 156  2.095  0.4227 
+ S2W1N - WF1N   -3.0958 1.83 156 -1.690  0.6936 
+ S3W1N - W1N     6.1375 1.83 156  3.351  0.0221 *
+ S3W1N - WF1N   -0.7958 1.83 156 -0.434  0.9999 
+ W1N - WF1N     -6.9333 1.83 156 -3.785  0.0053 *
+
 
 ```{r UM corn count analysis -- trts}
 # model analysis for unmarketable cob count trts
@@ -1802,14 +2667,29 @@ qqnorm(resid.model.UMtrt)
 shapiro.test(resid.model.UMtrt)
 
 # means
-UMcountemmeans1<- emmeans(model.UM.trt.best, pairwise ~ Cult)
-UMcountemmeans1
-plot(UMcountemmeans1, comparisons=T) # Std > Early
-
-UMcountemmeans2<- emmeans(model.UM.trt.best, pairwise ~ Location)
-UMcountemmeans2
-plot(UMcountemmeans2, comparisons=T) # Harrow > Agassiz & StJean
+UMcountemmeans<- emmeans(model.UM.trt.best, pairwise ~ Cult)
+UMcountemmeans
+plot(UMcountemmeans, comparisons=T) # Std > Early
 ```
+*Best Model:*
+UM_count ~ Cult + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+     Sum Sq Mean Sq NumDF  DenDF F value   Pr(>F)   
+Cult 283.73  283.73     1 119.55  7.8665 0.005879 **
+
+*Assumptions:*
+Good
+
+*Means:*
+ Cult     emmean   SE   df lower.CL upper.CL
+ Early      19.2 4.84 2.74     2.95     35.5
+ Standard   22.2 4.82 2.70     5.89     38.6
+
+*Contrasts:*
+ contrast         estimate   SE  df t.ratio p.value
+ Early - Standard    -3.01 1.08 114 -2.796  0.0061 *
+
 
 ```{r UM corn count analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
@@ -1819,17 +2699,17 @@ anova(model.UMw)
 
 model.UMw.best<- get_model(lmerTest::step(model.UMw, reduce.random=F))
 summary(model.UMw.best)
-Anova(model.UMw.best, type="III")
+anova(model.UMw.best)
 
 # check residuals
 resid.model.UMw<- resid(model.UMw.best)
 pred.model.UMw<- predict(model.UMw.best)
 
 # check randomness
-plot(pred.model.UMw, resid.model.UMw, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMw, resid.model.UMw, ylab="Residuals", xlab="UM count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMw, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMw, main="Histogram of Residuals", xlab="UM count")
 
 qqnorm(resid.model.UMw)
 
@@ -1840,7 +2720,19 @@ shapiro.test(resid.model.UMw)
 
 # no effect of weediness
 ```
+*Best Model:*
+UM_count ~ (1 | Year/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+Good
+
+*Means:*
+None
+ 
+ 
 ```{r UM corn count analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
 model.UMw600<- lmer(UM_count ~ Weediness * Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datw1)
@@ -1849,17 +2741,17 @@ anova(model.UMw600)
 
 model.UMw600.best<- get_model(lmerTest::step(model.UMw600, reduce.random=F))
 summary(model.UMw600.best)
-Anova(model.UMw600.best, type="III")
+anova(model.UMw600.best)
 
 # check residuals
 resid.model.UMw600<- resid(model.UMw600.best)
 pred.model.UMw600<- predict(model.UMw600.best)
 
 # check randomness
-plot(pred.model.UMw600, resid.model.UMw600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals") 
+plot(pred.model.UMw600, resid.model.UMw600, ylab="Residuals", xlab="UM count", main="Predictecd vs Residuals") 
 
 # check normality
-hist(resid.model.UMw600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMw600, main="Histogram of Residuals", xlab="UM count")
 
 qqnorm(resid.model.UMw600)
 
@@ -1867,19 +2759,42 @@ qqnorm(resid.model.UMw600)
 shapiro.test(resid.model.UMw600)
 
 # means
-UMw600emmeans<- emmeans(model.UMw600.best, pairwise ~ Weediness:Cult)
+UMw600emmeans<- emmeans(model.UMw600.best, pairwise ~ Weediness*Cult)
 UMw600emmeans
-plot(UMw600emmeans, comparisons=T) 
-
-UMw600emmeans1<- emmeans(model.UMw600.best, pairwise ~ Location)
-UMw600emmeans1
-plot(UMw600emmeans1, comparisons=T) # Harrow > StJean
-
+plot(UMw600emmeans, comparisons=T)
 
 # weediness by cultivar interaction:
 ## Early: WF > W
 ## Std: W = WF
 ```
+*Best Model:*
+UM_count ~ Weediness * Cult + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+               Sum Sq Mean Sq NumDF  DenDF F value  Pr(>F)  
+Weediness      135.00  135.00     1 36.561  3.4226 0.07240 .
+Cult            29.61   29.61     1 36.561  0.7507 0.39192  
+Weediness:Cult 168.38  168.38     1 36.561  4.2686 0.04596 *
+
+*Assumptions:*
+Not great -- not a lot of data
+
+*Means:*
+ Weediness Cult     emmean   SE   df lower.CL upper.CL
+ W         Early      18.4 7.31 1.55    -23.6     60.4
+ WF        Early      25.5 7.31 1.55    -16.5     67.5
+ W         Standard   23.7 7.31 1.55    -18.3     65.7
+ WF        Standard   23.3 7.31 1.55    -18.6     65.3
+ 
+*Contrasts:*
+ contrast                 estimate   SE   df t.ratio p.value
+ W Early - WF Early         -7.100 2.56 34.9 -2.769  0.0424 *
+ W Early - W Standard       -5.317 2.56 34.9 -2.074  0.1817 
+ W Early - WF Standard      -4.925 2.56 34.9 -1.921  0.2381 
+ WF Early - W Standard       1.783 2.56 34.9  0.696  0.8981 
+ WF Early - WF Standard      2.175 2.56 34.9  0.848  0.8310 
+ W Standard - WF Standard    0.392 2.56 34.9  0.153  0.9987 
+
 
 ```{r UM corn count analysis -- w vs wf trts, S 600}
 # test effect of w/wf trt -> S, 600
@@ -1889,17 +2804,17 @@ anova(model.UMws)
 
 model.UMws.best<- get_model(lmerTest::step(model.UMws, reduce.random=F))
 summary(model.UMws.best)
-Anova(model.UMws.best, type="III")
+anova(model.UMws.best)
 
 # check residuals
 resid.model.UMws<- resid(model.UMws.best)
 pred.model.UMws<- predict(model.UMws.best)
 
 # check randomness
-plot(pred.model.UMws, resid.model.UMws, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMws, resid.model.UMws, ylab="Residuals", xlab="UM count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMws, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMws, main="Histogram of Residuals", xlab="UM count")
 
 qqnorm(resid.model.UMws)
 
@@ -1910,7 +2825,19 @@ shapiro.test(resid.model.UMws)
 
 # no effect of weediness
 ```
+*Best Model:*
+UM_count ~ (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+Bad -- not a lot of data, hist messy
+
+*Means:*
+None
+ 
+ 
 ```{r UM corn count analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
 model.UMwf<- lmer(UM_count ~ Trt_code + (1 | Year / Rep), data=Hdatwf)
@@ -1919,17 +2846,17 @@ anova(model.UMwf)
 
 model.UMwf.best<- get_model(lmerTest::step(model.UMwf, reduce.random=F))
 summary(model.UMwf.best)
-Anova(model.UMwf.best, type="III")
+anova(model.UMwf.best)
 
 # check residuals
 resid.model.UMwf<- resid(model.UMwf.best)
 pred.model.UMwf<- predict(model.UMwf.best)
 
 # check randomness
-plot(pred.model.UMwf, resid.model.UMwf, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwf, resid.model.UMwf, ylab="Residuals", xlab="UM count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwf, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwf, main="Histogram of Residuals", xlab="UM count")
 
 qqnorm(resid.model.UMwf) 
 
@@ -1938,6 +2865,18 @@ shapiro.test(resid.model.UMwf)
 
 # no main effects
 ```
+*Best Model:*
+UM_count ~ (1 | Year/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Not great -- hist square-like
+
+*Means:*
+None
+
 
 ```{r UM corn count analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
@@ -1947,17 +2886,17 @@ anova(model.UMwf)
 
 model.UMwf600.best<- get_model(lmerTest::step(model.UMwf600, reduce.random=F))
 summary(model.UMwf600.best)
-Anova(model.UMwf600.best, type="III")
+anova(model.UMwf600.best)
 
 # check residuals
 resid.model.UMwf600<- resid(model.UMwf600.best)
 pred.model.UMwf600<- predict(model.UMwf600.best)
 
 # check randomness
-plot(pred.model.UMwf600, resid.model.UMwf600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwf600, resid.model.UMwf600, ylab="Residuals", xlab="UM count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwf600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwf600, main="Histogram of Residuals", xlab="UM count")
 
 qqnorm(resid.model.UMwf600) 
 
@@ -1965,10 +2904,19 @@ qqnorm(resid.model.UMwf600)
 shapiro.test(resid.model.UMwf600)
 
 # means
-UMwf600emmeans<- emmeans(model.UMwf600.best, pairwise ~ Location*Trt_code)
-UMwf600emmeans
-plot(UMwf600emmeans, comparisons=T) # StJean: E > S > NR; Harrow: all =
 ```
+*Best Model:*
+UM_count ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Not great -- not a lot of data
+
+*Means:*
+None
+
 
 ```{r UM corn count analysis -- wf trt vs ctrl, S 600}
 # test effect of trts
@@ -1978,17 +2926,17 @@ anova(model.UMwfs)
 
 model.UMwfs.best<- get_model(lmerTest::step(model.UMwfs, reduce.random=F))
 summary(model.UMwfs.best)
-Anova(model.UMwf.best, type="III")
+anova(model.UMwf.best)
 
 # check residuals
 resid.model.UMwfs<- resid(model.UMwfs.best)
 pred.model.UMwfs<- predict(model.UMwfs.best)
 
 # check randomness
-plot(pred.model.UMwfs, resid.model.UMwfs, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwfs, resid.model.UMwfs, ylab="Residuals", xlab="UM count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwfs, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwfs, main="Histogram of Residuals", xlab="UM count")
 
 qqnorm(resid.model.UMwfs) 
 
@@ -1997,26 +2945,38 @@ shapiro.test(resid.model.UMwfs)
 
 # no main effects
 ```
+*Best Model:*
+UM_count ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Bad -- hist 3 peaked, pred vs res split
+
+*Means:*
+None
+
 
 ```{r UM corn count analysis -- wf trts, E & S all SR}
 # test effect of trts
-model.UMwftrt<- lmer(UM_count ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=Hdatwftrt)
+model.UMwftrt<- lmer(UM_count ~ Cult * SR + (1 | Year / Rep), data=Hdatwftrt)
 summary(model.UMwftrt)
 anova(model.UMwftrt)
 
 model.UMwftrt.best<- get_model(lmerTest::step(model.UMwftrt, reduce.random=F))
 summary(model.UMwftrt.best)
-Anova(model.UMwftrt.best, type="III")
+anova(model.UMwftrt.best)
 
 # check residuals
 resid.model.UMwftrt<- resid(model.UMwftrt.best)
 pred.model.UMwftrt<- predict(model.UMwftrt.best)
 
 # check randomness
-plot(pred.model.UMwftrt, resid.model.UMwftrt, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwftrt, resid.model.UMwftrt, ylab="Residuals", xlab="UM count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwftrt, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwftrt, main="Histogram of Residuals", xlab="UM count")
 
 qqnorm(resid.model.UMwftrt) 
 
@@ -2025,6 +2985,18 @@ shapiro.test(resid.model.UMwftrt)
 
 # no main effects
 ```
+*Best Model:*
+UM_count ~ (1 | Year/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Fine
+
+*Means:*
+None
+
 
 ```{r UM corn count analysis -- wf trts, E & S 600}
 # test effect of trts
@@ -2034,17 +3006,17 @@ anova(model.UMwftrt600)
 
 model.UMwftrt600.best<- get_model(lmerTest::step(model.UMwftrt600, reduce.random=F))
 summary(model.UMwftrt600.best)
-Anova(model.UMwftrt600.best, type="III")
+anova(model.UMwftrt600.best)
 
 # check residuals
 resid.model.UMwftrt600<- resid(model.UMwftrt600.best)
 pred.model.UMwftrt600<- predict(model.UMwftrt600.best)
 
 # check randomness
-plot(pred.model.UMwftrt600, resid.model.UMwftrt600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwftrt600, resid.model.UMwftrt600, ylab="Residuals", xlab="UM count", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwftrt600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwftrt600, main="Histogram of Residuals", xlab="UM count")
 
 qqnorm(resid.model.UMwftrt600) 
 
@@ -2052,11 +3024,18 @@ qqnorm(resid.model.UMwftrt600)
 shapiro.test(resid.model.UMwftrt600)
 
 # means
-UMwftrt600emmeans<- emmeans(model.UMwftrt600.best, pairwise ~ Location)
-UMwftrt600emmeans
-plot(UMwftrt600emmeans, comparisons=T) # Harrow > StJean
 ```
+*Best Model:*
+UM_count ~ (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+Good but not a lot of data
+
+*Means:*
+None
 
 ### Unmarketable corn weight
 
@@ -2095,10 +3074,19 @@ qqnorm(resid.model.UMwt)
 shapiro.test(resid.model.UMwt)
 
 # means
-UMwtemmeans<- emmeans(model.UMwt.best, pairwise ~ Trt_code|Location)
-UMwtemmeans
-plot(UMwtemmeans, comparisons=T) # Agassiz: WF > trts & W, Harrow & StJean all same
 ```
+*Best Model:*
+UM_wt ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+slightly right skewed -- outliers?
+
+*Means:*
+None
+
 
 ```{r UM corn wt analysis -- trts}
 # model analysis for unmarketable cob weight trt vs ctrl
@@ -2130,6 +3118,18 @@ UMwtemmeans1<- emmeans(model.UMwt.trt.best, pairwise ~ Location)
 UMwtemmeans1
 plot(UMwtemmeans1, comparisons=T) # Harrow & StJean > Agassiz
 ```
+*Best Model:*
+UM_wt ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+fine
+
+*Means:*
+None
+
 
 ```{r UM corn wt analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
@@ -2139,17 +3139,17 @@ anova(model.UMwtw)
 
 model.UMwtw.best<- get_model(lmerTest::step(model.UMwtw, reduce.random=F))
 summary(model.UMwtw.best)
-Anova(model.UMwtw.best, type="III")
+anova(model.UMwtw.best)
 
 # check residuals
 resid.model.UMwtw<- resid(model.UMwtw.best)
 pred.model.UMwtw<- predict(model.UMwtw.best)
 
 # check randomness
-plot(pred.model.UMwtw, resid.model.UMwtw, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwtw, resid.model.UMwtw, ylab="Residuals", xlab="UM wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwtw, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwtw, main="Histogram of Residuals", xlab="UM wt")
 
 qqnorm(resid.model.UMwtw)
 
@@ -2171,17 +3171,17 @@ anova(model.UMwtw2)
 
 model.UMwtw.best2<- get_model(lmerTest::step(model.UMwtw2, reduce.random=F))
 summary(model.UMwtw.best2)
-Anova(model.UMwtw.best2, type="III")
+anova(model.UMwtw.best2)
 
 # check residuals
 resid.model.UMwtw2<- resid(model.UMwtw.best2)
 pred.model.UMwtw2<- predict(model.UMwtw.best2)
 
 # check randomness
-plot(pred.model.UMwtw2, resid.model.UMwtw2, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwtw2, resid.model.UMwtw2, ylab="Residuals", xlab="UM wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwtw2, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwtw2, main="Histogram of Residuals", xlab="UM wt")
 
 qqnorm(resid.model.UMwtw2)
 
@@ -2193,6 +3193,18 @@ shapiro.test(resid.model.UMwtw2)
 
 # no effect of weediness
 ```
+*Best Model:*
+UM_wt ~ (1 | Year/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Bad -- outlier -- removed = better
+
+*Means:*
+None
+
 
 ```{r UM corn wt analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
@@ -2202,17 +3214,17 @@ anova(model.UMwtw600)
 
 model.UMwtw600.best<- get_model(lmerTest::step(model.UMwtw600, reduce.random=F))
 summary(model.UMwtw600.best)
-Anova(model.UMwtw600.best, type="III")
+anova(model.UMwtw600.best)
 
 # check residuals
 resid.model.UMwtw600<- resid(model.UMwtw600.best)
 pred.model.UMwtw600<- predict(model.UMwtw600.best)
 
 # check randomness
-plot(pred.model.UMwtw600, resid.model.UMwtw600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals") 
+plot(pred.model.UMwtw600, resid.model.UMwtw600, ylab="Residuals", xlab="UM wt", main="Predictecd vs Residuals") 
 
 # check normality
-hist(resid.model.UMwtw600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwtw600, main="Histogram of Residuals", xlab="UM wt")
 
 qqnorm(resid.model.UMwtw600)
 
@@ -2226,6 +3238,25 @@ plot(UMwtw600emmeans, comparisons=T)
 
 # WF > W
 ```
+*Best Model:*
+UM_wt ~ Weediness + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+           Sum Sq Mean Sq NumDF  DenDF F value  Pr(>F)  
+Weediness 1749156 1749156     1 37.739   4.988 0.03153 *
+
+*Assumptions:*
+fine but not a lot of data
+
+*Means:*
+ Weediness emmean  SE   df lower.CL upper.CL
+ W           1913 705 1.03    -6448    10275
+ WF          2295 705 1.03    -6066    10657
+ 
+*Contrasts:*
+ contrast estimate  SE   df t.ratio p.value
+ W - WF       -382 171 35.9 -2.233  0.0318 *
+
 
 ```{r UM corn wt analysis -- w vs wf trts, S 600}
 # test effect of w/wf trt -> S, 600
@@ -2235,17 +3266,17 @@ anova(model.UMwtws)
 
 model.UMwtws.best<- get_model(lmerTest::step(model.UMwtws, reduce.random=F))
 summary(model.UMwtws.best)
-Anova(model.UMwtws.best, type="III")
+anova(model.UMwtws.best)
 
 # check residuals
 resid.model.UMwtws<- resid(model.UMwtws.best)
 pred.model.UMwtws<- predict(model.UMwtws.best)
 
 # check randomness
-plot(pred.model.UMwtws, resid.model.UMwtws, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwtws, resid.model.UMwtws, ylab="Residuals", xlab="UM wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwtws, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwtws, main="Histogram of Residuals", xlab="UM wt")
 
 qqnorm(resid.model.UMwtws)
 
@@ -2256,7 +3287,19 @@ shapiro.test(resid.model.UMwtws)
 
 # no effect of weediness
 ```
+*Best Model:*
+UM_wt ~ (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+bad hist of resids -- not enough data
+
+*Means:*
+None
+ 
+ 
 ```{r UM corn wt analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
 model.UMwtwf<- lmer(UM_wt ~ Trt_code + (1 | Year / Rep), data=Hdatwf)
@@ -2265,17 +3308,17 @@ anova(model.UMwtwf)
 
 model.UMwtwf.best<- get_model(lmerTest::step(model.UMwtwf, reduce.random=F))
 summary(model.UMwtwf.best)
-Anova(model.UMwtwf.best, type="III")
+anova(model.UMwtwf.best)
 
 # check residuals
 resid.model.UMwtwf<- resid(model.UMwtwf.best)
 pred.model.UMwtwf<- predict(model.UMwtwf.best)
 
 # check randomness
-plot(pred.model.UMwtwf, resid.model.UMwtwf, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwtwf, resid.model.UMwtwf, ylab="Residuals", xlab="Um wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwtwf, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwtwf, main="Histogram of Residuals", xlab="Um wt")
 
 qqnorm(resid.model.UMwtwf) 
 
@@ -2284,6 +3327,18 @@ shapiro.test(resid.model.UMwtwf)
 
 # no main effects
 ```
+*Best Model:*
+UM_wt ~ (1 | Year/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Fine except outlier
+
+*Means:*
+None
+ 
 
 ```{r UM corn wt analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
@@ -2293,17 +3348,17 @@ anova(model.UMwt600wf)
 
 model.UMwt600wf.best<- get_model(lmerTest::step(model.UMwt600wf, reduce.random=F))
 summary(model.UMwt600wf.best)
-Anova(model.UMwt600wf.best, type="III")
+anova(model.UMwt600wf.best)
 
 # check residuals
 resid.model.UMwt600wf<- resid(model.UMwt600wf.best)
 pred.model.UMwt600wf<- predict(model.UMwt600wf.best)
 
 # check randomness
-plot(pred.model.UMwt600wf, resid.model.UMwt600wf, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwt600wf, resid.model.UMwt600wf, ylab="Residuals", xlab="Um wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwt600wf, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwt600wf, main="Histogram of Residuals", xlab="UM wt")
 
 qqnorm(resid.model.UMwt600wf) 
 
@@ -2311,10 +3366,19 @@ qqnorm(resid.model.UMwt600wf)
 shapiro.test(resid.model.UMwt600wf)
 
 # means
-UMwt600wfemmeans<- emmeans(model.UMwt600wf.best, pairwise ~ Trt_code*Location)
-UMwt600wfemmeans
-plot(UMwt600wfemmeans, comparisons=T) # StJean NR < rest
 ```
+*Best Model:*
+UM_wt ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Fine except outlier
+
+*Means:*
+None
+ 
 
 ```{r UM corn wt analysis -- wf trt vs ctrl, S 600}
 # test effect of trts
@@ -2324,17 +3388,17 @@ anova(model.UMwtswf)
 
 model.UMwtswf.best<- get_model(lmerTest::step(model.UMwtswf, reduce.random=F))
 summary(model.UMwtswf.best)
-Anova(model.UMwtswf.best, type="III")
+anova(model.UMwtswf.best)
 
 # check residuals
 resid.model.UMwtswf<- resid(model.UMwtswf.best)
 pred.model.UMwtswf<- predict(model.UMwtswf.best)
 
 # check randomness
-plot(pred.model.UMwtswf, resid.model.UMwtswf, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwtswf, resid.model.UMwtswf, ylab="Residuals", xlab="UM wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwtswf, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwtswf, main="Histogram of Residuals", xlab="UM wt")
 
 qqnorm(resid.model.UMwtswf) 
 
@@ -2342,11 +3406,20 @@ qqnorm(resid.model.UMwtswf)
 shapiro.test(resid.model.UMwtswf)
 
 # means
-UMwtswfemmeans<- emmeans(model.Mwtswf.best, pairwise ~ Location)
-UMwtswfemmeans
-plot(UMwtswfemmeans, comparisons=T) # Harrow > StJean
 ```
+*Best Model:*
+UM_wt ~ (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+Not enough data
+
+*Means:*
+None
+ 
+ 
 ```{r UM corn wt analysis -- wf trts, E & S all SR}
 # test effect of trts
 model.UMwtwftrt<- lmer(UM_wt ~ Cult * SR + (1 | Year / Rep), data=Hdatwftrt)
@@ -2355,17 +3428,17 @@ anova(model.UMwtwftrt)
 
 model.UMwtwftrt.best<- get_model(lmerTest::step(model.UMwtwftrt, reduce.random=F))
 summary(model.UMwtwftrt.best)
-Anova(model.UMwtwftrt.best, type="III")
+anova(model.UMwtwftrt.best)
 
 # check residuals
 resid.model.UMwtwftrt<- resid(model.UMwtwftrt.best)
 pred.model.UMwtwftrt<- predict(model.UMwtwftrt.best)
 
 # check randomness
-plot(pred.model.UMwtwftrt, resid.model.UMwtwftrt, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwtwftrt, resid.model.UMwtwftrt, ylab="Residuals", xlab="UM wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwtwftrt, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwtwftrt, main="Histogram of Residuals", xlab="UM wt")
 
 qqnorm(resid.model.UMwtwftrt) 
 
@@ -2374,7 +3447,19 @@ shapiro.test(resid.model.UMwtwftrt)
 
 # no main effects
 ```
+*Best Model:*
+UM_wt ~ (1 | Year/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+Fine except outlier
+
+*Means:*
+None
+ 
+ 
 ```{r UM corn wt analysis -- wf trts, E & S 600}
 # test effect of trts
 model.UMwtwftrt600<- lmer(UM_wt ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1)
@@ -2383,17 +3468,17 @@ anova(model.UMwtwftrt600)
 
 model.UMwtwftrt600.best<- get_model(lmerTest::step(model.UMwtwftrt600, reduce.random=F))
 summary(model.UMwtwftrt600.best)
-Anova(model.UMwtwftrt600.best, type="III")
+anova(model.UMwtwftrt600.best)
 
 # check residuals
 resid.model.UMwtwftrt600<- resid(model.UMwtwftrt600.best)
 pred.model.UMwtwftrt600<- predict(model.UMwtwftrt600.best)
 
 # check randomness
-plot(pred.model.UMwtwftrt600, resid.model.UMwtwftrt600, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+plot(pred.model.UMwtwftrt600, resid.model.UMwtwftrt600, ylab="Residuals", xlab="UM wt", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.UMwtwftrt600, main="Histogram of Residuals", xlab="Corn stand")
+hist(resid.model.UMwtwftrt600, main="Histogram of Residuals", xlab="UM wt")
 
 qqnorm(resid.model.UMwtwftrt600) 
 
@@ -2402,7 +3487,18 @@ shapiro.test(resid.model.UMwtwftrt600)
 
 # no main effects
 ```
+*Best Model:*
+UM_wt ~ (1 | Year/Rep) + (1 | Location/Rep)
 
+*Effects:*
+
+
+*Assumptions:*
+Not great -- not enough data
+
+*Means:*
+None
+ 
 
 
 ### Weeds
@@ -2446,12 +3542,12 @@ print(Wplot2)
 ### since repeated measures, plot added as random effect (not nested or cross classified)
 
 # lmer
-model.weedcount<- lmer(Count ~ Cult * SR * Location * Time + (1 | Rep : Year) + (1 | Plot), data=wdat)
+model.weedcount<- lmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Plot), data=wdat)
 summary(model.weedcount)
 Anova(model.weedcount, type="III")
 
 # glmer
-model.weedcount2<- glmer(Count ~ Cult * SR * Location * Time + (1 | Rep : Year) + (1 | Plot), data=wdat, family=poisson)
+model.weedcount2<- glmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Plot), data=wdat, family=poisson)
 Anova(model.weedcount2, type="III")
 
 # check residuals

@@ -152,7 +152,9 @@ Statistical design is an incomplete RBD with cultivar & seeding rate as factoria
 
 Y = $\mu$ + block + cult * SR + (1 | Year / Rep) + (1 | Location / Rep) + e
 
-
+#### Models that need help:
+  - injury & mortality -- ratings out of 100 
+    - mortality increases up to 100 over time
 
 ### Rye biomass
 
@@ -333,7 +335,7 @@ Fine
 
 ### Rye stem diameter
 
-```{r rye stem diam}
+```{r rye stem diam plots}
 datwtrt$DiamAv
 
 # plot of rye stem diameter by cultivar & seeding rate, separated by year, Harrow only
@@ -343,7 +345,9 @@ diamplot1<- ggplot(subset(diamdat, Cult=="Standard"|Cult=="Early"), aes(x = Cult
           facet_wrap(~Year, ncol=1)+
           theme_bw()
 print(diamplot1)
+```
 
+```{r model rye stem diam }
 # model analysis for rye stem diameter
 model.diam<- lmer(DiamAv ~ Cult * SR + (1 | Year / Rep), data=diamdat)
 summary(model.diam)
@@ -408,7 +412,7 @@ Possible outlier on lower end but fine
  300 - 600    0.334 0.0937 57 3.560   0.0022 *
 
 ### Rye anthesis
-```{r rye anthesis}
+```{r rye anthesis plots}
 datwtrt$anthesis
 
 anthplot1<- ggplot(datwtrt, aes(x = Cult, y = anthesis, colour=factor(Location))) +
@@ -416,57 +420,72 @@ anthplot1<- ggplot(datwtrt, aes(x = Cult, y = anthesis, colour=factor(Location))
           facet_wrap(~Year)+
           theme_bw()
 print(anthplot1)
+```
 
-# model analysis for rye stem diameter
-model.anth<- lmer(anthesis ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
-summary(model.anth)
-anova(model.anth)
+```{r rye anthesis means}
 
-model.anth.best<- get_model(lmerTest::step(model.anth, reduce.random=F))
-summary(model.anth.best)
-anova(model.anth.best)
-
-# check residuals
-resid.model.anth<- resid(model.anth.best)
-pred.model.anth<- predict(model.anth.best)
-
-# check randomness
-plot(pred.model.anth, resid.model.anth, ylab="Residuals", xlab="Rye stem diameter", main="Predictecd vs Residuals")
-
-# check normality
-hist(resid.model.anth, main="Histogram of Residuals", xlab="Rye stem diameter")
-
-qqnorm(resid.model.anth) 
-
-# Shapiro-Wilk test
-shapiro.test(resid.model.anth)
-
-anthemmeans1<- emmeans(model.anth.best, pairwise ~ Cult*Location)
-anthemmeans1
-plot(anthemmeans1, comparisons=T)
 ```
 
 
-### Mortality
+### Mortality -- needs help
 ```{r rye mortality data manipulation}
 # use WF data too?? was it sprayed after all mortality data collected?
 mortdat<- datwtrt[,c(1:10, 38, 41, 44, 47)]
 mortdatlong<- gather(mortdat, Time, Mort, Mort_7DAT:Mort_28DAT)
 str(mortdatlong)
+mortdatlong$Time<- as.factor(mortdatlong$Time)
 ```
 
 ```{r rye mortality graphs}
 
 ```
-
+-> can you have fixed effects that are significant as an interaction but not linearly on their own?
 ```{r rye mortality models}
-model.mort<- lmer(Mort ~ Cult * SR * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong)
-summary(model.mort)
-anova(model.mort)
+# glmer w/ manual model reduction
+# full model
+model.mort1<- glmer(Mort ~ Cult * SR * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort1) # AIC: 8445.9
+# cult * SR
+model.mort2<- glmer(Mort ~ Cult * SR + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort2) # AIC: 12717.3
+# cult
+model.mort3<- glmer(Mort ~ Cult + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort3) # AIC: 12720.3
+# cult * time
+model.mort4<- glmer(Mort ~ Cult * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort4) # AIC: 8459.0
+# SR * time
+model.mort5<- glmer(Mort ~ SR * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort5) # AIC: 9307.5
+# cult + SR + time
+model.mort6<- glmer(Mort ~ Cult + SR + Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort6) # AIC: 8853.3
+# cult * SR + time
+model.mort7<- glmer(Mort ~ Cult * SR + Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort7) # AIC: 8851.0
+# cult + sr * time
+model.mort8<- glmer(Mort ~ Cult + SR * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort8) # AIC: 8848.9
+# cult * time + SR
+model.mort9<- glmer(Mort ~ Cult * Time + SR + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort9) # 8458.3
+# no effects
+model.mort10<- glmer(Mort ~ 1 + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort10) # 13178.9
+# SR
+model.mort11<- glmer(Mort ~ SR + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort11) # 12178.3
+# Time
+model.mort12<- glmer(Mort ~ Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
+summary(model.mort12) # 9312.5
 
-model.mort.best<- get_model(lmerTest::step(model.mort, reduce.random=F))
+# best model: Mort ~ Cult * SR * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep)
+```
+
+```{r best mort model analysis}
+model.mort.best<- glmer(Mort ~ Cult * SR * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=mortdatlong, family=poisson(link="log"))
 summary(model.mort.best)
-anova(model.mort.best)
+Anova(model.mort.best, type="III")
 
 # check residuals
 resid.model.mort<- resid(model.mort.best)
@@ -482,73 +501,51 @@ qqnorm(resid.model.mort)
 
 # Shapiro-Wilk test
 shapiro.test(resid.model.mort)
+# assumptions fine
 
-# means
-mortemmeans<- emmeans(model.mort.best, pairwise ~ Cult*Time)
+mortemmeans<- emmeans(model.mort.best, pairwise ~ Cult*SR*Time, type="response")
 mortemmeans
 plot(mortemmeans, comparisons=T)
+
 ```
+
 *Best Model:*
-Mort ~ Cult + Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep) + Cult:Time
+Mort ~ Cult + SR + Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep) + SR:Time + Cult:Time + SR:Cult + Cult:SR:Time
 
 *Effects:*
-          Sum Sq Mean Sq NumDF  DenDF F value    Pr(>F)    
-Cult       31376   31376     1 692.35 111.247 < 2.2e-16 ***
-Time      225066   75022     3 680.15 266.000 < 2.2e-16 ***
-Cult:Time  15089    5030     3 680.15  17.834 3.757e-11 ***
+             npar Sum Sq Mean Sq   F value
+Cult            1  279.0  279.03  279.0269
+SR              2    8.0    3.98    3.9754
+Time            3 3397.6 1132.55 1132.5489
+Cult:SR         2    6.8    3.40    3.4020
+Cult:Time       3  396.8  132.25  132.2539
+SR:Time         6   16.0    2.66    2.6634
+Cult:SR:Time    6   18.1    3.02    3.0200
+
+                 Chisq Df Pr(>Chisq)    
+(Intercept)  1831.5097  1  < 2.2e-16 ***
+Cult          128.4964  1  < 2.2e-16 ***
+SR              2.7597  2   0.251621    
+Time          353.4682  3  < 2.2e-16 ***
+Cult:SR         0.5673  2   0.753047    
+Cult:Time      95.0303  3  < 2.2e-16 ***
+SR:Time        10.7472  6   0.096510 .  
+Cult:SR:Time   18.1264  6   0.005924 ** 
 
 *Assumptions:*
 Okay
 
 *Means:*
- Cult     Time       emmean   SE   df lower.CL upper.CL
- Early    Mort_14DAT   74.3 7.43 3.76    53.14     95.5
- Standard Mort_14DAT   49.6 7.40 3.69    28.39     70.8
- Early    Mort_21DAT   81.7 7.43 3.76    60.52    102.8
- Standard Mort_21DAT   67.9 7.40 3.69    46.67     89.1
- Early    Mort_28DAT   83.9 7.43 3.76    62.77    105.1
- Standard Mort_28DAT   84.6 7.40 3.69    63.41    105.9
- Early    Mort_7DAT    45.4 7.43 3.76    24.23     66.5
- Standard Mort_7DAT    28.8 7.40 3.69     7.53     50.0
+
 
 *Comparisons:*
- contrast                                  estimate   SE  df t.ratio p.value
- Early Mort_14DAT - Standard Mort_14DAT      24.678 2.53 684   9.762 <.0001 *
- Early Mort_14DAT - Early Mort_21DAT         -7.381 2.59 681  -2.848 0.0852 
- Early Mort_14DAT - Standard Mort_21DAT       6.397 2.53 684   2.531 0.1843 
- Early Mort_14DAT - Early Mort_28DAT         -9.631 2.59 681  -3.717 0.0053 *
- Early Mort_14DAT - Standard Mort_28DAT     -10.342 2.53 684  -4.091 0.0012 *
- Early Mort_14DAT - Early Mort_7DAT          28.905 2.59 681  11.154 <.0001 *
- Early Mort_14DAT - Standard Mort_7DAT       45.543 2.53 684  18.016 <.0001 *
- Standard Mort_14DAT - Early Mort_21DAT     -32.059 2.53 684 -12.682 <.0001 *
- Standard Mort_14DAT - Standard Mort_21DAT  -18.281 2.42 681  -7.542 <.0001 *
- Standard Mort_14DAT - Early Mort_28DAT     -34.309 2.53 684 -13.572 <.0001 *
- Standard Mort_14DAT - Standard Mort_28DAT  -35.021 2.42 681 -14.448 <.0001 *
- Standard Mort_14DAT - Early Mort_7DAT        4.226 2.53 684   1.672 0.7056 
- Standard Mort_14DAT - Standard Mort_7DAT    20.865 2.42 681   8.608 <.0001 *
- Early Mort_21DAT - Standard Mort_21DAT      13.778 2.53 684   5.450 <.0001 *
- Early Mort_21DAT - Early Mort_28DAT         -2.250 2.59 681  -0.868 0.9887 
- Early Mort_21DAT - Standard Mort_28DAT      -2.961 2.53 684  -1.172 0.9398 
- Early Mort_21DAT - Early Mort_7DAT          36.286 2.59 681  14.003 <.0001 *
- Early Mort_21DAT - Standard Mort_7DAT       52.924 2.53 684  20.936 <.0001 *
- Standard Mort_21DAT - Early Mort_28DAT     -16.028 2.53 684  -6.341 <.0001 *
- Standard Mort_21DAT - Standard Mort_28DAT  -16.740 2.42 681  -6.906 <.0001 *
- Standard Mort_21DAT - Early Mort_7DAT       22.508 2.53 684   8.904 <.0001 *
- Standard Mort_21DAT - Standard Mort_7DAT    39.146 2.42 681  16.149 <.0001 *
- Early Mort_28DAT - Standard Mort_28DAT      -0.711 2.53 684  -0.281 1.0000 
- Early Mort_28DAT - Early Mort_7DAT          38.536 2.59 681  14.871 <.0001 *
- Early Mort_28DAT - Standard Mort_7DAT       55.174 2.53 684  21.826 <.0001 *
- Standard Mort_28DAT - Early Mort_7DAT       39.247 2.53 684  15.526 <.0001 *
- Standard Mort_28DAT - Standard Mort_7DAT    55.885 2.42 681  23.055 <.0001 *
- Early Mort_7DAT - Standard Mort_7DAT        16.638 2.53 684   6.582 <.0001 *
+
 
 ### Pop ups
 ```{r rye pop up data manipulation}
-# use WF data too?? was it sprayed after all mortality data collected?
-popdat<- datwtrt[,c(1:10, 39, 42, 45, 48)]
-popdatlong<- gather(popdat, Time, Pop, Pop_7DAT:Pop_28DAT)
-str(popdatlong)
-popdatlong$Pop<- as.integer(popdatlong$Pop)
+popdat <- datwtrt %>%
+  gather(key = "Time", value = "Pop",Pop_7DAT,Pop_14DAt,Pop_21DAT,Pop_28DAT) %>%
+  convert_as_factor(Plot, Time)
 ```
 
 ```{r rye pop up graphs}
@@ -556,13 +553,59 @@ popdatlong$Pop<- as.integer(popdatlong$Pop)
 ```
 
 ```{r rye popup models}
-model.pop<- glmer(Pop ~ Cult * SR * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
-summary(model.pop)
-anova(model.pop)
+# cult * SR * Time
+model.pop1<- glmer(Pop ~ Cult * SR * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop1) # AIC: 10600
+# cult * SR
+model.pop2<- glmer(Pop ~ Cult * SR + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop2) # AIC: 13720.1
+# cult * Time
+model.pop3<- glmer(Pop ~ Cult * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop3) # AIC: 10453.2
+# SR * Time
+model.pop4<- glmer(Pop ~ SR * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop4) # AIC: 13422.3
+# cult + SR + Time
+model.pop5<- glmer(Pop ~ Cult + SR + Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop5) # AIC: 12951.4
+# cult * SR + Time
+model.pop6<- glmer(Pop ~ Cult * SR + Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop6) # AIC: 12893.5
+# cult + SR * Time
+model.pop7<- glmer(Pop ~ Cult + SR * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop7) # AIC: 12844.6
+# cult * Time + SR
+model.pop8<- glmer(Pop ~ Cult * Time + SR + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop8) # AIC: 10756.4
+# cult + SR
+model.pop9<- glmer(Pop ~ Cult + SR + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop9) # AIC: 13778
+# cult + Time
+model.pop10<- glmer(Pop ~ Cult + Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop10) # AIC: 12948.1
+#  SR + Time
+model.pop11<- glmer(Pop ~ SR + Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop11) # AIC: 13529.1
+# cult
+model.pop12<- glmer(Pop ~ Cult + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop12) # AIC: 13774.7
+#  SR 
+model.pop13<- glmer(Pop ~  SR + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop13) # AIC: 14355.7
+# Time
+model.pop14<- glmer(Pop ~  Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop14) # AIC: 13525.9
+# no effects
+model.pop15<- glmer(Pop ~ 1 + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+summary(model.pop15) # AIC: 14352.4
 
-model.pop.best<- stepcAIC(model.pop) # won't converge
+# best model: model.pop3<- glmer(Pop ~ Cult * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
+```
+
+```{r best rye pop up model}
+model.pop.best<- glmer(Pop ~ Cult * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep), data=popdatlong, family=poisson(link="log"))
 summary(model.pop.best)
-anova(model.pop.best)
+Anova(model.pop.best, type="III")
 
 # check residuals
 resid.model.pop<- resid(model.pop.best)
@@ -572,35 +615,77 @@ pred.model.pop<- predict(model.pop.best)
 plot(pred.model.pop, resid.model.pop, ylab="Residuals", xlab="Rye pop ups", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.pop, main="Histogram of Residuals", xlab="Rye pop ups")
+hist(resid.model.pop, main="Histogram of Residuals", xlab="Rye pop ups") # potential outlier?
 
-qqnorm(resid.model.mort) 
+qqnorm(resid.model.pop) 
 
 # Shapiro-Wilk test
-shapiro.test(resid.model.mort)
+shapiro.test(resid.model.pop)
 
 # means
-mortemmeans<- emmeans(model.mort.best, pairwise ~ Cult*Time)
-mortemmeans
-plot(mortemmeans, comparisons=T)
+popemmeans<- emmeans(model.pop.best, pairwise ~ Cult*Time, type="response")
+popemmeans
+plot(popemmeans)
 ```
 *Best Model:*
-Pop ~ Cult + Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep) + Cult:Time
+Pop ~ Cult * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Rep)
 
 *Effects:*
-          Sum Sq Mean Sq NumDF  DenDF F value    Pr(>F)    
-Cult       14823 14822.8     1 695.42  30.645 4.394e-08 ***
-Time       23168  7722.7     3 681.45  15.966 4.841e-10 ***
-Cult:Time  57726 19242.0     3 681.45  39.781 < 2.2e-16 ***
+          npar  Sum Sq Mean Sq F value
+Cult         1  284.71  284.71  284.71
+Time         3  991.14  330.38  330.38
+Cult:Time    3 2030.62  676.87  676.87
+
+               Chisq Df Pr(>Chisq)    
+(Intercept)   47.471  1  5.583e-12 ***
+Cult         815.119  1  < 2.2e-16 ***
+Time        2182.588  3  < 2.2e-16 ***
+Cult:Time   2032.278  3  < 2.2e-16 ***
 
 *Assumptions:*
-
+Good but potential upper outlier
 
 *Means:*
-
+ Cult     Time       rate    SE  df asymp.LCL asymp.UCL
+ Early    Pop_14DAt 10.73  3.70 Inf      5.46      21.1
+ Standard Pop_14DAt 27.38  9.41 Inf     13.96      53.7
+ Early    Pop_21DAT 12.45  4.29 Inf      6.34      24.4
+ Standard Pop_21DAT 14.14  4.87 Inf      7.21      27.8
+ Early    Pop_28DAT 30.75 10.57 Inf     15.68      60.3
+ Standard Pop_28DAT 18.81  6.47 Inf      9.59      36.9
+ Early    Pop_7DAT   8.23  2.84 Inf      4.19      16.2
+ Standard Pop_7DAT  28.99  9.96 Inf     14.78      56.9
 
 *Comparisons:*
-
+ contrast                                ratio     SE  df z.ratio p.value
+ Early Pop_14DAt / Standard Pop_14DAt    0.392 0.0129 Inf -28.550 <.0001 
+ Early Pop_14DAt / Early Pop_21DAT       0.862 0.0330 Inf  -3.892 0.0025 
+ Early Pop_14DAt / Standard Pop_21DAT    0.759 0.0278 Inf  -7.548 <.0001 
+ Early Pop_14DAt / Early Pop_28DAT       0.349 0.0114 Inf -32.322 <.0001 
+ Early Pop_14DAt / Standard Pop_28DAT    0.570 0.0198 Inf -16.174 <.0001 
+ Early Pop_14DAt / Early Pop_7DAT        1.304 0.0555 Inf   6.233 <.0001 
+ Early Pop_14DAt / Standard Pop_7DAT     0.370 0.0121 Inf -30.526 <.0001 
+ Standard Pop_14DAt / Early Pop_21DAT    2.198 0.0684 Inf  25.325 <.0001 
+ Standard Pop_14DAt / Standard Pop_21DAT 1.936 0.0556 Inf  22.977 <.0001 
+ Standard Pop_14DAt / Early Pop_28DAT    0.890 0.0211 Inf  -4.894 <.0001 
+ Standard Pop_14DAt / Standard Pop_28DAT 1.456 0.0383 Inf  14.278 <.0001 
+ Standard Pop_14DAt / Early Pop_7DAT     3.327 0.1207 Inf  33.142 <.0001 
+ Standard Pop_14DAt / Standard Pop_7DAT  0.944 0.0221 Inf  -2.457 0.2142 
+ Early Pop_21DAT / Standard Pop_21DAT    0.880 0.0309 Inf  -3.629 0.0069 
+ Early Pop_21DAT / Early Pop_28DAT       0.405 0.0125 Inf -29.293 <.0001 
+ Early Pop_21DAT / Standard Pop_28DAT    0.662 0.0219 Inf -12.458 <.0001 
+ Early Pop_21DAT / Early Pop_7DAT        1.513 0.0625 Inf  10.038 <.0001 
+ Early Pop_21DAT / Standard Pop_7DAT     0.429 0.0132 Inf -27.396 <.0001 
+ Standard Pop_21DAT / Early Pop_28DAT    0.460 0.0132 Inf -27.000 <.0001 
+ Standard Pop_21DAT / Standard Pop_28DAT 0.752 0.0232 Inf  -9.228 <.0001 
+ Standard Pop_21DAT / Early Pop_7DAT     1.719 0.0683 Inf  13.631 <.0001 
+ Standard Pop_21DAT / Standard Pop_7DAT  0.488 0.0139 Inf -25.217 <.0001 
+ Early Pop_28DAT / Standard Pop_28DAT    1.635 0.0430 Inf  18.683 <.0001 
+ Early Pop_28DAT / Early Pop_7DAT        3.737 0.1348 Inf  36.558 <.0001 
+ Early Pop_28DAT / Standard Pop_7DAT     1.061 0.0248 Inf   2.510 0.1910 
+ Standard Pop_28DAT / Early Pop_7DAT     2.286 0.0869 Inf  21.758 <.0001 
+ Standard Pop_28DAT / Standard Pop_7DAT  0.649 0.0169 Inf -16.655 <.0001 
+ Early Pop_7DAT / Standard Pop_7DAT      0.284 0.0102 Inf -34.936 <.0001 
 
 
 ### Corn VT stage
@@ -626,16 +711,17 @@ print(standplot1)
 # model analysis for corn stand 
 
 # test effect of rye
-model.stand<- glmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw, family=poisson(link="log"))
-summary(model.stand)
-anova(model.stand)
+model.stand1<- glmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw, family=poisson(link="log"))
+summary(model.stand1) # AIC: 1719.6
+model.stand2<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datw, family=poisson(link="log"))
+summary(model.stand2) # AIC: 1728.7
 
-model.stand.best<- stepcAIC(model.stand)
-# best model is original, above
+model.stand.best<- glmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw, family=poisson(link="log"))
+Anova(model.stand.best, type="III")
 
 # check residuals
-resid.model.stand<- resid(model.stand)
-pred.model.stand<- predict(model.stand)
+resid.model.stand<- resid(model.stand.best)
+pred.model.stand<- predict(model.stand.best)
 
 # check randomness
 plot(pred.model.stand, resid.model.stand, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
@@ -650,7 +736,7 @@ qqnorm(resid.model.stand) # messy on ends
 shapiro.test(resid.model.stand)
 # data assumptions not great
 
-standemmeans<- emmeans(model.stand, pairwise ~ Trt_code, type="response")
+standemmeans<- emmeans(model.stand.best, pairwise ~ Trt_code, type="response")
 standemmeans
 plot(standemmeans, comparisons=T)
 ```
@@ -658,8 +744,12 @@ plot(standemmeans, comparisons=T)
 Corn_stand ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
 
 *Effects:*
-         Sum Sq Mean Sq NumDF  DenDF F value  Pr(>F)  
-Trt_code 709.11   101.3     7 222.27  2.5881 0.01386 *
+         npar Sum Sq Mean Sq F value
+Trt_code    7 22.683  3.2404  3.2404
+
+               Chisq Df Pr(>Chisq)    
+(Intercept) 1651.229  1  < 2.2e-16 ***
+Trt_code      22.695  7   0.001926 ** 
 
 *Assumptions:*
 slightly left skewed
@@ -709,12 +799,18 @@ slightly left skewed
 
 ```{r corn stand analysis -- trts}
 # test effect of trts
-model.standtrt<- glmer(Corn_stand ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt, family=poisson(link="log"))
-summary(model.standtrt)
-anova(model.standtrt)
+model.standtrt1<- glmer(Corn_stand ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt, family=poisson(link="log"))
+summary(model.standtrt1) # AIC: 1187.4
+model.standtrt2<- glmer(Corn_stand ~ Cult + SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt, family=poisson(link="log"))
+summary(model.standtrt2) # AIC: 1187.2
+model.standtrt3<- glmer(Corn_stand ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt, family=poisson(link="log"))
+summary(model.standtrt3) # AIC: 1185.2
+model.standtrt4<- glmer(Corn_stand ~ SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt, family=poisson(link="log"))
+summary(model.standtrt4) # AIC: 1185.2
+model.standtrt5<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt, family=poisson(link="log"))
+summary(model.standtrt5) # AIC: 1183.2
 
-model.standtrt.best<- stepcAIC(model.standtrt)
-summary(model.standtrt.best)
+model.standtrt.best<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt, family=poisson(link="log"))
 anova(model.standtrt.best)
 
 # check residuals
@@ -732,43 +828,16 @@ qqnorm(resid.model.standtrt) # messy on ends
 
 # Shapiro-Wilk test
 shapiro.test(resid.model.standtrt)
-# data assumptions not great... try transformations
-
-
-# transformations (none really helped)
-model.standtrt2<- lmer((Corn_stand)^1/3 ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)
-summary(model.standtrt2)
-anova(model.standtrt2)
-
-model.standtrt.best2<- get_model(lmerTest::step(model.standtrt2, reduce.random=F))
-summary(model.standtrt.best2)
-Anova(model.standtrt.best2, type="III")
-
-# check residuals
-resid.model.standtrt2<- resid(model.standtrt.best2)
-pred.model.standtrt2<- predict(model.standtrt.best2)
-
-# check randomness
-plot(pred.model.standtrt2, resid.model.standtrt2, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
-
-# check normality
-hist(resid.model.standtrt2, main="Histogram of Residuals", xlab="Corn stand")
-# long tails on left
-
-qqnorm(resid.model.standtrt2) # messy on ends
-
-# Shapiro-Wilk test
-shapiro.test(resid.model.standtrt2)
-
+# data assumptions not great... can you transform glmer?
 ```
 *Best Model:*
-Corn_stand ~ (1 | Year/Rep) + (1 | Location/Rep)
+Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep)
 
 *Effects:*
 
 
 *Assumptions:*
-slightly left skewed -- cubed slightly helped but not really
+slightly left skewed -- transform glmer?
 
 *Means:*
 None
@@ -776,12 +845,20 @@ None
 
 ```{r corn stand analysis -- w vs wf trts, E & S all SR}
 # test effect of w/wf trt -> Harrow E & S, all SR
-model.standw<- glmer(Corn_stand ~ Weediness * Cult * SR + (1 | Year / Rep), data=Hdatw, family=poisson(link="log"))
-summary(model.standw)
-anova(model.standw)
+model.standw1<- glmer(Corn_stand ~ Weediness * Cult * SR + (1 | Year / Rep), data=Hdatw, family=poisson(link="log"))
+summary(model.standw1) # AIC: 566.1
+model.standw2<- glmer(Corn_stand ~ Weediness * Cult + (1 | Year / Rep), data=Hdatw, family=poisson(link="log"))
+summary(model.standw2) # AIC: 551.7
+model.standw3<- glmer(Corn_stand ~ Weediness * SR + (1 | Year / Rep), data=Hdatw, family=poisson(link="log"))
+summary(model.standw3) # AIC: 554.9
+model.standw4<- glmer(Corn_stand ~ Cult * SR + (1 | Year / Rep), data=Hdatw, family=poisson(link="log"))
+summary(model.standw4) # AIC: 555.0
+model.standw5<- glmer(Corn_stand ~ Weediness + (1 | Year / Rep), data=Hdatw, family=poisson(link="log"))
+summary(model.standw5) # AIC: 547.7
+model.standw6<- glmer(Corn_stand ~ 1 + (1 | Year / Rep), data=Hdatw, family=poisson(link="log"))
+summary(model.standw6) # AIC: 545.8
 
-model.standw.best<- stepcAIC(model.standw)
-summary(model.standw.best)
+model.standw.best<- glmer(Corn_stand ~ 1 + (1 | Year / Rep), data=Hdatw, family=poisson(link="log"))
 anova(model.standw.best)
 
 # check residuals
@@ -810,7 +887,7 @@ Corn_stand ~ (1 | Year/Rep)
 
 
 *Assumptions:*
-Good
+Bad randomness (all in straight line)
 
 *Means:*
 None
@@ -818,12 +895,16 @@ None
 
 ```{r corn stand analysis -- w vs wf trts, E & S 600}
 # test effect of w/wf trt -> Harrow & StJean E & S, 600
-model.standw600<- glmer(Corn_stand ~ Weediness * Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datw1, family=poisson(link="log"))
-summary(model.standw600)
-anova(model.standw600)
+model.standw6001<- glmer(Corn_stand ~ Weediness * Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datw1, family=poisson(link="log"))
+summary(model.standw6001) # AIC: 312.5
+model.standw6002<- glmer(Corn_stand ~ Weediness + (1 | Year / Rep) + (1 | Location / Rep), data=datw1, family=poisson(link="log"))
+summary(model.standw6002) # AIC: 310.0
+model.standw6003<- glmer(Corn_stand ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datw1, family=poisson(link="log"))
+summary(model.standw6003) # AIC: 309.8
+model.standw6004<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datw1, family=poisson(link="log"))
+summary(model.standw6004) # AIC: 308.1
 
-model.standw600.best<- stepcAIC(model.standw600)
-summary(model.standw600.best)
+model.standw600.best<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datw1, family=poisson(link="log"))
 anova(model.standw600.best)
 
 # check residuals
@@ -852,7 +933,7 @@ Corn_stand ~ (1 | Year/Rep) + (1 | Location/Rep)
 
 
 *Assumptions:*
-Not great -- not a lot of data
+Not great -- not a lot of data, not random
 
 *Means:*
 None
@@ -860,12 +941,13 @@ None
 
 ```{r corn stand analysis -- w vs wf trts, S 600}
 # test effect of w/wf trt ->  S, 600
-model.standws<- glmer(Corn_stand ~ Weediness + (1 | Year / Rep) + (1 | Location / Rep), data=datw2, family=poisson(link="log"))
-summary(model.standws)
-anova(model.standws)
+model.standws1<- glmer(Corn_stand ~ Weediness + (1 | Year / Rep) + (1 | Location / Rep), data=datw2, family=poisson(link="log"))
+summary(model.standws1) # AIC: 164.1
+model.standws2<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datw2, family=poisson(link="log"))
+summary(model.standws2) # AIC: 163.3
 
-model.standws.best<- stepcAIC(model.standws)
-summary(model.standws.best)
+
+model.standws.best<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datw2, family=poisson(link="log"))
 anova(model.standws.best)
 
 # check residuals
@@ -894,7 +976,7 @@ Corn_stand ~ (1 | Year/Rep) + (1 | Location/Rep)
 
 
 *Assumptions:*
-Not great -- not a lot of data
+Not great -- not a lot of data, bad randomness
 
 *Means:*
 None
@@ -902,12 +984,12 @@ None
 
 ```{r corn stand analysis -- wf trt vs ctrl, E & S all SR}
 # test effect of trts
-model.standwf<- glmer(Corn_stand ~ Trt_code + (1 | Year / Rep), data=Hdatwf, family=poisson(link="log"))
-summary(model.standwf)
-anova(model.standwf)
+model.standwf1<- glmer(Corn_stand ~ Trt_code + (1 | Year / Rep), data=Hdatwf, family=poisson(link="log"))
+summary(model.standwf1) # AIC: 336.4
+model.standwf2<- glmer(Corn_stand ~ 1 + (1 | Year / Rep), data=Hdatwf, family=poisson(link="log"))
+summary(model.standwf2) # AIC: 325.7
 
-model.standwf.best<- stepcAIC(model.standwf)
-summary(model.standwf.best)
+model.standwf.best<- glmer(Corn_stand ~ 1 + (1 | Year / Rep), data=Hdatwf, family=poisson(link="log"))
 anova(model.standwf.best)
 
 # check residuals
@@ -934,7 +1016,7 @@ Corn_stand ~ (1 | Year/Rep)
 
 
 *Assumptions:*
-Fine
+Bad randomness
 
 *Means:*
 None
@@ -942,13 +1024,13 @@ None
 
 ```{r corn stand analysis -- wf trt vs ctrl, E & S 600}
 # test effect of trts
-model.standwf600<- lmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1)
-summary(model.standwf600)
-anova(model.standwf600)
+model.standwf6001<- glmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1, family=poisson(link="log"))
+summary(model.standwf6001) # AIC: 243.2
+model.standwf6002<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1, family=poisson(link="log"))
+summary(model.standwf6002) # AIC: 249.2
 
-model.standwf600.best<- get_model(lmerTest::step(model.standwf600, reduce.random=F))
-summary(model.standwf600.best)
-anova(model.standwf600.best)
+model.standwf600.best<- glmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf1, family=poisson(link="log"))
+Anova(model.standwf600.best, type="III")
 
 # check residuals
 resid.model.standwf600<- resid(model.standwf600.best)
@@ -966,41 +1048,45 @@ qqnorm(resid.model.standwf600)
 shapiro.test(resid.model.standwf600)
 
 # means
-standwf600emmeans<- emmeans(model.standwf600.best, pairwise ~ Trt_code)
+standwf600emmeans<- emmeans(model.standwf600.best, pairwise ~ Trt_code, type="response")
 standwf600emmeans
-plot(standwf600emmeans, comparisons=T) # [Harrow E = Harrow S = Harrow NR] > [StJean E = StJean S] > StJean NR, (Harrow NR = StJean E)
+plot(standwf600emmeans, comparisons=T) 
 ```
 *Best Model:*
 Corn_stand ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
 
 *Effects:*
-         Sum Sq Mean Sq NumDF  DenDF F value   Pr(>F)   
-Trt_code 297.06  148.53     2 31.171   7.597 0.002053 **
+         npar Sum Sq Mean Sq F value
+Trt_code    2 9.7484  4.8742  4.8742
+
+               Chisq Df Pr(>Chisq)    
+(Intercept) 377.9200  1  < 2.2e-16 ***
+Trt_code      9.7582  2   0.007604 ** 
 
 *Assumptions:*
 Not great -- hist square-like
 
 *Means:*
- Trt_code emmean   SE   df lower.CL upper.CL
- E3WF1N     31.0 6.48 1.11    -34.7     96.8
- S3WF1N     30.1 6.48 1.11    -35.6     95.9
- WF1N       24.5 6.48 1.11    -41.2     90.3
+ Trt_code rate   SE  df asymp.LCL asymp.UCL
+ E3WF1N   29.9 5.22 Inf      21.2      42.1
+ S3WF1N   29.0 5.08 Inf      20.6      40.9
+ WF1N     24.0 4.23 Inf      17.0      33.9
 
 *Contrasts:*
- contrast        estimate   SE   df t.ratio p.value
- E3WF1N - S3WF1N    0.917 1.81 24.2 0.508   0.8683 
- E3WF1N - WF1N      6.500 1.81 24.2 3.601   0.0039 *
- S3WF1N - WF1N      5.583 1.81 24.2 3.093   0.0132 *
+ contrast        ratio     SE  df z.ratio p.value
+ E3WF1N / S3WF1N  1.03 0.0738 Inf 0.395   0.9177 
+ E3WF1N / WF1N    1.25 0.0941 Inf 2.923   0.0097 *
+ S3WF1N / WF1N    1.21 0.0921 Inf 2.532   0.0305 *
 
 
 ```{r corn stand analysis -- wf trts vs ctrl, S 600}
 # test effect of trts
-model.standwfs<- lmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf2)
-summary(model.standwfs)
-anova(model.standwfs)
+model.standwfs1<- glmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datwf2, family=poisson(link="log"))
+summary(model.standwfs1) # AIC: 163.5
+model.standwfs2<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datwf2, family=poisson(link="log"))
+summary(model.standwfs2) # AIC: 161.7
 
-model.standwfs.best<- get_model(lmerTest::step(model.standwfs, reduce.random=F))
-summary(model.standwfs.best)
+model.standwfs.best<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datwf2, family=poisson(link="log"))
 anova(model.standwfs.best)
 
 # check residuals
@@ -1027,7 +1113,7 @@ Corn_stand ~ (1 | Year/Rep) + (1 | Location/Rep)
 
 
 *Assumptions:*
-Not great -- not a lot of data
+Not great -- not a lot of data, randomness bad
 
 *Means:*
 None
@@ -1035,12 +1121,17 @@ None
  
 ```{r corn stand analysis -- wf trts, E & S all SR}
 # test effect within trts
-model.standwftrt<- lmer(Corn_stand ~ Cult * SR + (1 | Year / Rep), data=Hdatwftrt)
-summary(model.standwftrt)
+model.standwftrt1<- glmer(Corn_stand ~ Cult * SR + (1 | Year / Rep), data=Hdatwftrt, family=poisson(link="log"))
+summary(model.standwftrt1) # AIC: 287.1
+model.standwftrt2<- glmer(Corn_stand ~ Cult + (1 | Year / Rep), data=Hdatwftrt, family=poisson(link="log"))
+summary(model.standwftrt2) # AIC: 280.2
+model.standwftrt3<- glmer(Corn_stand ~ SR + (1 | Year / Rep), data=Hdatwftrt, family=poisson(link="log"))
+summary(model.standwftrt3) # AIC: 281.5
+model.standwftrt4<- glmer(Corn_stand ~ 1 + (1 | Year / Rep), data=Hdatwftrt, family=poisson(link="log"))
+summary(model.standwftrt4) # AIC: 278.2
 anova(model.standwftrt)
 
-model.standwftrt.best<- get_model(lmerTest::step(model.standwftrt, reduce.random=F))
-summary(model.standwftrt.best)
+model.standwftrt.best<- glmer(Corn_stand ~ 1 + (1 | Year / Rep), data=Hdatwftrt, family=poisson(link="log"))
 anova(model.standwftrt.best)
 
 # check residuals
@@ -1067,7 +1158,7 @@ Corn_stand ~ (1 | Year/Rep)
 
 
 *Assumptions:*
-Good
+Not random
 
 *Means:*
 None
@@ -1075,12 +1166,12 @@ None
 
 ```{r corn stand analysis -- wf trts, E & S 600}
 # test effect within trts
-model.standwftrt600<- lmer(Corn_stand ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1)
-summary(model.standwftrt600)
-anova(model.standwftrt600)
+model.standwftrt6001<- glmer(Corn_stand ~ Cult + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1, family=poisson(link="log"))
+summary(model.standwftrt6001) # AIC: 152.0
+model.standwftrt6002<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1, family=poisson(link="log"))
+summary(model.standwftrt6002) # AIC: 150.2
 
-model.standwftrt600.best<- get_model(lmerTest::step(model.standwftrt600, reduce.random=F))
-summary(model.standwftrt600.best)
+model.standwftrt600.best<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datwftrt1, family=poisson(link="log"))
 anova(model.standwftrt600.best)
 
 # check residuals
@@ -1101,13 +1192,17 @@ shapiro.test(resid.model.standwftrt600)
 # means
 ```
 *Best Model:*
-Corn_stand ~ (1 | Year/Rep) + (1 | Location/Rep)
+Corn_stand ~ 1 + (1 | Year/Rep) + (1 | Location/Rep)
 
 *Effects:*
-
+     npar  Sum Sq Mean Sq F value
+Cult    1 0.15586 0.15586  0.1559
+              Chisq Df Pr(>Chisq)    
+(Intercept) 942.200  1     <2e-16 ***
+Cult          0.156  1     0.6928  
 
 *Assumptions:*
-Not great -- not a lot of data
+Not great -- not a lot of data, not random
 
 *Means:*
 None
@@ -1619,7 +1714,7 @@ Not great -- hist square-like
 
 
 
-### Corn injury
+### Corn injury -- needs help
 ```{r corn injury data manipulation}
 injurydat<- datwtrt[,c(1:10, 62:64)]
 injurydatlong<- gather(injurydat, Time, Injury, Injury_14DAE:Injury_28DAE)
@@ -1843,10 +1938,10 @@ Mplot1<- ggplot(datw, aes(x = Trt_code, y = M_count, fill=factor(SR))) +
           theme_bw()
 print(Mplot1)
 ```
-
+Not converging with glmer so using glmer
 ```{r M corn count analysis -- trt vs ctrl}
 # model analysis for marketable corn count trts vs ctrls
-model.M<- lmer(M_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw)
+model.M<- glmer(M_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw)
 summary(model.M)
 anova(model.M)
 
@@ -2918,7 +3013,7 @@ None
 
 
 ### Unmarketable corn count
-
+Not converging with glmer so using lmer
 ```{r UM corn count}
 # plot of unmarketable cob count by cultivar & seeding rate, separated by location & year
 UMplot1<- ggplot(datw, aes(x = Trt_code, y = UM_count, fill=factor(SR))) +
@@ -3884,7 +3979,6 @@ Wtable<-wdat %>%
 Wtable$Time<- factor(Wtable$Time, levels = c("PRE","28DAT","56DAT")) # reorder Time levels so chronological
 ```
 
-
 ```{r weed count analysis -- graphs}
 # plot sum of weed counts & SD from table against seeding rate, factored by cultivar (shape) & time (colour), facted by location & year
 ## dodged position for easier reading
@@ -3905,24 +3999,48 @@ Wplot2<- ggplot(Wtable, aes(x=Time, y=Sum, colour=factor(SR), shape=factor(Cult)
 print(Wplot2)
 ```
 
-
-```{r weed count analysis -- models}
+```{r weed count analysis -- model selection}
 # weed count models
 ## count data so glmer used with poisson distribution
 ### since repeated measures, plot added as random effect within year & location
 
-# glmer
-model.weedcount<- glmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
-Anova(model.weedcount2, type="III")
+# manual model reduction
 
-# lmer
-model.weedcount2<- lmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat)
-summary(model.weedcount)
-Anova(model.weedcount, type="III")
+# Cult * SR * Time
+model.weedcount1<- glmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount1) # AIC: 44719
+# Cult * SR
+model.weedcount2<- glmer(Count ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount2) # AIC: 48349.9
+# Cult * Time
+model.weedcount3<- glmer(Count ~ Cult * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount3) # AIC: 44769.9
+# SR * Time
+model.weedcount4<- glmer(Count ~ SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount4) # AIC: 44791.2
+# Cult + SR + Time
+model.weedcount5<- glmer(Count ~ Cult + SR + Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount5) # AIC: 44800.0
+# Cult + SR * Time
+model.weedcount6<- glmer(Count ~ Cult + SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount6) # AIC: 44790.2
+# Cult * SR + Time
+model.weedcount7<- glmer(Count ~ Cult * SR + Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount7) # AIC: 44804.0
+# no effects
+model.weedcount8<- glmer(Count ~ 1 + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount8) # AIC: 60014.3
+
+# best model: glmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot)
+```
+
+```{r weed count analysis -- assumptions & means}
+model.weedcount.best<- glmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson(link="log"))
+Anova(model.weedcount.best, type="III")
 
 # check residuals
-resid.model.wcount<- resid(model.weedcount)
-pred.model.wcount<- predict(model.weedcount)
+resid.model.wcount<- resid(model.weedcount.best)
+pred.model.wcount<- predict(model.weedcount.best)
 
 # check randomness
 plot(pred.model.wcount, resid.model.wcount, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
@@ -3938,48 +4056,60 @@ qqnorm(resid.model.wcount) # curvy shape
 shapiro.test(resid.model.wcount)
 # assumptions not met, needs transformations? Or not using right format of data?
 
-# check residuals
-resid.model.wcount2<- resid(model.weedcount2)
-pred.model.wcount2<- predict(model.weedcount2)
-
-# check randomness
-plot(pred.model.wcount2, resid.model.wcount2, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
-# weird trend
-
-# check normality
-hist(resid.model.wcount2, main="Histogram of Residuals", xlab="weed counts")
-# long tails on right
-
-qqnorm(resid.model.wcount2) # curvy shape
-
-# Shapiro-Wilk test
-shapiro.test(resid.model.wcount2)
-# assumptions not met, needs transformations? Or not using right format of data?
-
-# both glmer & lmer assumptions bad
-
-# try glmer w/ transformations
-model.weedcount3<- glmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson(link="log"))
-Anova(model.weedcount2, type="III")
-
-# check residuals
-resid.model.wcount3<- resid(model.weedcount3)
-pred.model.wcount3<- predict(model.weedcount3)
-
-# check randomness
-plot(pred.model.wcount3, resid.model.wcount3, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
-# weird trend
-
-# check normality
-hist(resid.model.wcount3, main="Histogram of Residuals", xlab="weed counts")
-# long tails on right
-
-qqnorm(resid.model.wcount3) # curvy shape
-
-# Shapiro-Wilk test
-shapiro.test(resid.model.wcount3)
-# assumptions not met, needs transformations? Or not using right format of data?
+#  means
+wcountemmeans<- emmeans(model.weedcount.best, pairwise ~ Cult*SR*Time, type="response")
+wcountemmeans
+plot(wcountemmeans)
 ```
+*Best Model:*
+Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot)
+
+*Effects:*
+             npar  Sum Sq Mean Sq   F value
+Cult            1    3.02    3.02    3.0199
+SR              2    3.30    1.65    1.6517
+Time            2 3062.51 1531.25 1531.2546
+Cult:SR         2    0.09    0.04    0.0435
+Cult:Time       2   34.18   17.09   17.0881
+SR:Time         4   17.92    4.48    4.4808
+Cult:SR:Time    4   51.41   12.85   12.8536
+
+                Chisq Df Pr(>Chisq)    
+(Intercept)   15.7688  1  7.157e-05 ***
+Cult           0.9423  1     0.3317    
+SR             2.7427  2     0.2538    
+Time         677.0624  2  < 2.2e-16 ***
+Cult:SR        1.1116  2     0.5736    
+Cult:Time     31.6768  2  1.323e-07 ***
+SR:Time       23.9742  4  8.083e-05 ***
+Cult:SR:Time  51.5960  4  1.676e-10 ***
+
+*Assumptions:*
+Bad
+
+*Means:*
+ Cult     SR  Time   rate    SE  df asymp.LCL asymp.UCL
+ Early    150 28DAT  4.62 1.783 Inf     2.172      9.85
+ Standard 150 28DAT  3.73 1.428 Inf     1.763      7.90
+ Early    300 28DAT  3.57 1.381 Inf     1.675      7.62
+ Standard 300 28DAT  2.12 0.817 Inf     0.996      4.51
+ Early    600 28DAT  3.19 1.236 Inf     1.496      6.82
+ Standard 600 28DAT  2.47 0.946 Inf     1.169      5.23
+ Early    150 56DAT  8.21 3.161 Inf     3.861     17.46
+ Standard 150 56DAT  8.25 3.149 Inf     3.904     17.43
+ Early    300 56DAT  5.97 2.301 Inf     2.801     12.70
+ Standard 300 56DAT  6.04 2.308 Inf     2.856     12.77
+ Early    600 56DAT  7.20 2.774 Inf     3.380     15.32
+ Standard 600 56DAT  5.13 1.952 Inf     2.433     10.81
+ Early    150 PRE   12.77 4.909 Inf     6.008     27.12
+ Standard 150 PRE    9.92 3.785 Inf     4.700     20.96
+ Early    300 PRE   10.31 3.967 Inf     4.847     21.91
+ Standard 300 PRE    7.74 2.955 Inf     3.666     16.36
+ Early    600 PRE    9.94 3.825 Inf     4.673     21.13
+ Standard 600 PRE    8.09 3.074 Inf     3.844     17.04
+
+*Comparisons:*
+
 
 
 #### Biomass
@@ -4513,15 +4643,14 @@ print(ryestandtotal)
 
 ```{r model rye stand, results='hide', message=FALSE, warning=FALSE}
 # total
-model.stand<- lmer((Rye_front_stand+Rye_back_stand) ~ Trt_plnt + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt)
-summary(model.stand)
-anova(model.stand)
+## Elora data only
+model.stand<- glmer((Rye_front_stand+Rye_back_stand) ~ Trt_plnt + (1 | Year/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.stand) # AIC: 495.7
+# no effects
+model.stand1<- glmer((Rye_front_stand+Rye_back_stand) ~ 1 + (1 | Year/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.stand1) # AIC: 494.5 -> better model
 
-## model reduction
-model.stand.best<- get_model(lmerTest::step(model.stand, reduce.random=F))
-summary(model.stand.best)
-anova(model.stand.best)
-### best model: (Rye_front_stand + Rye_back_stand) ~ (1 | Rep)
+model.stand.best<- glmer((Rye_front_stand+Rye_back_stand) ~ 1 + (1 | Year/Rep), data=dirtrt, family=poisson(link="log"))
 ```
 
 ```{r rye stand model assumptions, results='hide', message=FALSE, warning=FALSE,}
@@ -4546,16 +4675,16 @@ shapiro.test(resid.model.stand)
 # no signficant main effects to compare means
 ```
 *Best Model:*
-
+(Rye_front_stand+Rye_back_stand) ~ Trt_plnt + (1 | Year/Rep)
 
 *Effects:*
-
+None
 
 *Assumptions:*
-
+Fine
 
 *Means:*
-
+None
 
 ### rye biomass
 
@@ -4648,15 +4777,27 @@ print(ryepop)
 ```
 
 ```{r model rye pop ups, results='hide', message=FALSE, warning=FALSE}
-model.pop<- lmer(popups ~ Trt_plnt*Trt_crmp*time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop)
-summary(model.pop)
-anova(model.pop)
+model.pop1<- glmer(popups ~ Trt_plnt*Trt_crmp*time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+summary(model.pop1) # AIC: 10261.4
 
-## model reduction
-model.pop.best<- get_model(lmerTest::step(model.pop, reduce.random=F))
-summary(model.pop.best)
-anova(model.pop.best)
-### best model: popups ~ Trt_crmp + time + (1 | Rep)
+model.pop2<- glmer(popups ~ Trt_plnt*Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+summary(model.pop2) # AIC: 16552.8
+
+model.pop3<- glmer(popups ~ Trt_plnt*time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+summary(model.pop4) # AIC: 13422.3
+
+model.pop4<- glmer(popups ~ Trt_crmp*time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+summary(model.pop4) # AIC: 10995.7
+
+model.pop5<- glmer(popups ~ Trt_plnt+Trt_crmp+time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+summary(model.pop5) # AIC: 11441.4
+
+model.pop6<- glmer(popups ~ 1 + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+summary(model.pop6) # AIC: 16547.7
+
+model.pop.best<- glmer(popups ~ Trt_plnt*Trt_crmp*time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+
+Anova(model.pop.best, type="III")
 ```
 
 ```{r rye pop up model assumptions, results='hide', message=FALSE, warning=FALSE}
@@ -4678,14 +4819,57 @@ shapiro.test(resid.model.pop)
 ```
 
 ```{r rye pop ups difference of means}
-popmean1<- emmeans(model.pop.best, pairwise ~ Trt_crmp)
-popmean1
-# 34.5 less pop ups in East crimped than North crimped
-
-popmean2<- emmeans(model.pop.best, pairwise ~ time)
-popmean2
-# pop ups at time 0 different from all other times, all other times not different from each other
+popmean<- emmeans(model.pop.best, pairwise ~ Trt_crmp*Trt_plnt*time, type="response")
+popmean
 ```
+*Best Model:*
+popups ~ Trt_plnt+Trt_crmp+time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot) + Trt_plnt:Trt_crmp:time
+
+*Effects:*
+                       npar Sum Sq Mean Sq  F value
+Trt_plnt                  1    0.9    0.87   0.8722
+Trt_crmp                  1    0.1    0.14   0.1429
+time                      4 3486.1  871.54 871.5371
+Trt_plnt:Trt_crmp         1    0.0    0.05   0.0482
+Trt_plnt:time             4  552.0  138.01 138.0113
+Trt_crmp:time             4  334.7   83.67  83.6733
+Trt_plnt:Trt_crmp:time    4  321.6   80.40  80.3978
+
+                           Chisq Df Pr(>Chisq)    
+(Intercept)             159.2560  1  < 2.2e-16 ***
+Trt_plnt                  0.3142  1     0.5751    
+Trt_crmp                 38.7614  1  4.789e-10 ***
+time                   1728.5902  4  < 2.2e-16 ***
+Trt_plnt:Trt_crmp        21.1148  1  4.326e-06 ***
+Trt_plnt:time           102.8316  4  < 2.2e-16 ***
+Trt_crmp:time           647.9535  4  < 2.2e-16 ***
+Trt_plnt:Trt_crmp:time  321.7414  4  < 2.2e-16 ***
+
+*Assumptions:*
+Not great
+
+*Means:*
+ Trt_crmp Trt_plnt time       rate    SE  df asymp.LCL asymp.UCL
+ E        E        Pop_0DAT   23.5  5.90 Inf      14.4      38.5
+ N        E        Pop_0DAT   78.3 19.26 Inf      48.3     126.8
+ E        N        Pop_0DAT   26.3  6.55 Inf      16.1      42.8
+ N        N        Pop_0DAT   24.8  6.17 Inf      15.2      40.4
+ E        E        Pop_14DAt 147.2 36.09 Inf      91.0     238.0
+ N        E        Pop_14DAt 104.8 25.72 Inf      64.8     169.5
+ E        N        Pop_14DAt 109.1 26.78 Inf      67.5     176.5
+ N        N        Pop_14DAt 108.9 26.72 Inf      67.3     176.2
+ E        E        Pop_21DAT 101.8 24.98 Inf      62.9     164.7
+ N        E        Pop_21DAT 117.5 28.83 Inf      72.7     190.1
+ E        N        Pop_21DAT  95.0 23.32 Inf      58.7     153.7
+ N        N        Pop_21DAT  96.3 23.64 Inf      59.5     155.8
+ E        E        Pop_28DAT  78.6 19.32 Inf      48.6     127.3
+ N        E        Pop_28DAT  71.9 17.66 Inf      44.4     116.3
+ E        N        Pop_28DAT  82.9 20.35 Inf      51.2     134.1
+ N        N        Pop_28DAT  90.6 22.24 Inf      56.0     146.5
+ E        E        Pop_7DAT  155.6 38.15 Inf      96.2     251.6
+ N        E        Pop_7DAT  134.8 33.04 Inf      83.3     217.9
+ E        N        Pop_7DAT  125.3 30.73 Inf      77.5     202.6
+ N        N        Pop_7DAT  124.2 30.46 Inf      76.8     200.9
 
 
 ### rye mortality
@@ -4727,30 +4911,24 @@ print(ryemort)
 # all the same at 21 & 28DAT
 ```
 
-```{r plot rye mortality rep effect, results='hide', message=FALSE, warning=FALSE}
-ryemortrep<- ggplot(dirmort, aes(x = Rep, y = mort)) +
-          geom_boxplot() +
-          theme_bw()
-print(ryemortrep)
-
-# no apparent rep effect
-
-# anova of reps to determine if statistically different
-ryemortrep<- anova_test(mort ~ Rep, data=dirmort)
-ryemortrep
-# not significant
-```
-
 ```{r model rye mortality, results='hide', message=FALSE, warning=FALSE}
-model.mort<- lmer(mort ~ Trt_plnt*Trt_crmp*time + ( 1 | Rep), data=dirmort)
-summary(model.mort)
-anova(model.mort)
+model.mort1<- glmer(mort ~ Trt_plnt*Trt_crmp*time + (1 | Year/Rep) + (1 | Location/Rep), data=dirmort, family=poisson(link="log"))
+summary(model.mort1) # AIC: 3494.4
 
-## model reduction
-model.mort.best<- get_model(lmerTest::step(model.mort, reduce.random=F))
-summary(model.mort.best)
-anova(model.mort.best)
-### best model: mort ~ Trt_plnt + time + (1 | Rep)
+model.mort2<- glmer(mort ~ Trt_plnt*Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep), data=dirmort, family=poisson(link="log"))
+summary(model.mort2) # AIC: 8761.6
+
+model.mort3<- glmer(mort ~ Trt_plnt*time + (1 | Year/Rep) + (1 | Location/Rep), data=dirmort, family=poisson(link="log"))
+summary(model.mort3) # AIC: 3501.2
+
+model.mort4<- glmer(mort ~ Trt_crmp*time + (1 | Year/Rep) + (1 | Location/Rep), data=dirmort, family=poisson(link="log"))
+summary(model.mort4) # AIC: 3517.4
+
+model.mort5<- glmer(mort ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dirmort, family=poisson(link="log"))
+summary(model.mort5) # AIC: 8766.6
+
+model.mort.best<- glmer(mort ~ Trt_plnt*Trt_crmp*time + (1 | Year/Rep) + (1 | Location/Rep), data=dirmort, family=poisson(link="log"))
+Anova(model.mort.best, type="III")
 ```
 
 ```{r rye mortality model assumptions, results='hide', message=FALSE, warning=FALSE}
@@ -4772,14 +4950,53 @@ shapiro.test(resid.model.mort)
 ```
 
 ```{r rye mortality difference of means}
-mortmean1<- emmeans(model.mort.best, pairwise ~ Trt_plnt)
-mortmean1
-# 4.38% better mortality in North than East planting
-
-mortmean2<- emmeans(model.mort.best, pairwise ~ time)
-mortmean2
-# increasing mortality over timem, all statistically different from each other
+mortmean<- emmeans(model.mort.best, pairwise ~ Trt_plnt*Trt_crmp*time, type="response")
+mortmean
 ```
+*Best Model:*
+mort ~ Trt_plnt+Trt_crmp+time + (1 | Year/Rep) + (1 | Location/Rep) + Trt_plnt:Trt_crmp:time + Trt_plnt:Trt_crmp + Trt_plnt:time + Trt_crmp:time
+
+*Effects:*
+                       npar Sum Sq Mean Sq   F value
+Trt_plnt                  1    0.3    0.31    0.3070
+Trt_crmp                  1    1.4    1.43    1.4290
+time                      3 3968.8 1322.93 1322.9268
+Trt_plnt:Trt_crmp         1    5.4    5.39    5.3856
+Trt_plnt:time             3   19.3    6.43    6.4291
+Trt_crmp:time             3    7.3    2.42    2.4235
+Trt_plnt:Trt_crmp:time    3    9.0    3.01    3.0148
+
+                           Chisq Df Pr(>Chisq)    
+(Intercept)            2464.9096  1  < 2.2e-16 ***
+Trt_plnt                 19.0984  1  1.242e-05 ***
+Trt_crmp                  3.8255  1  0.0504786 .  
+time                   1078.2603  3  < 2.2e-16 ***
+Trt_plnt:Trt_crmp         2.1170  1  0.1456681    
+Trt_plnt:time            17.6103  3  0.0005292 ***
+Trt_crmp:time             3.3642  3  0.3388093    
+Trt_plnt:Trt_crmp:time    9.0457  3  0.0286893 *  
+
+*Assumptions:*
+Fine
+
+*Means:*
+ Trt_plnt Trt_crmp time       rate   SE  df asymp.LCL asymp.UCL
+ E        E        Mort_7DAT  18.0 1.05 Inf      16.0      20.2
+ N        E        Mort_7DAT  23.7 1.26 Inf      21.4      26.3
+ E        N        Mort_7DAT  20.4 1.14 Inf      18.3      22.8
+ N        N        Mort_7DAT  23.7 1.26 Inf      21.4      26.3
+ E        E        Mort_14DAT 55.6 2.39 Inf      51.1      60.5
+ N        E        Mort_14DAT 61.3 2.59 Inf      56.5      66.6
+ E        N        Mort_14DAT 57.2 2.45 Inf      52.6      62.2
+ N        N        Mort_14DAT 52.3 2.28 Inf      48.0      57.0
+ E        E        Mort_21DAT 80.9 3.26 Inf      74.8      87.6
+ N        E        Mort_21DAT 84.2 3.37 Inf      77.9      91.1
+ E        N        Mort_21DAT 81.4 3.27 Inf      75.2      88.0
+ N        N        Mort_21DAT 81.8 3.29 Inf      75.6      88.5
+ E        E        Mort_28DAT 90.9 3.60 Inf      84.1      98.2
+ N        E        Mort_28DAT 90.6 3.59 Inf      83.8      97.9
+ E        N        Mort_28DAT 91.1 3.60 Inf      84.3      98.4
+ N        N        Mort_28DAT 91.4 3.61 Inf      84.6      98.8
 
 
 ### corn stand
@@ -4809,32 +5026,25 @@ print(cstand)
 # no apparent treatment differences
 ```
 
-```{r plot corn stand rep effect}
-cstandrep<- ggplot(dir2, aes(x = Rep, y = stand)) +
-          geom_boxplot() +
-          theme_bw()
-print(cstandrep)
-
-# no apparent rep effects
-
-# anova of reps to determine if statistically different
-cstandrep<- anova_test(stand ~ Rep, data=dir2)
-cstandrep
-# not significant
-```
-
 ```{r model corn stand trt vs ctrl}
 # first test if treatments are different from control
-model.cstand<- lmer(Corn_stand ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir)
-summary(model.cstand)
-anova(model.cstand)
+model.cstand1<- glmer(Corn_stand ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.cstand1) # AIC: 876.0
 
-## model reduction
-model.cstand.best<- get_model(lmerTest::step(model.cstand, reduce.random=F))
-summary(model.cstand.best)
-anova(model.cstand.best)
+model.cstand2<- glmer(Corn_stand ~ Trt_num + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.cstand2) # AIC: 885.1
 
-# no difference between treatments & control
+model.cstand3<- glmer(Corn_stand ~  Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.cstand3) # AIC: 884.8
+
+model.cstand4<- glmer(Corn_stand ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.cstand4) # AIC: 885.0
+
+model.cstand5<- glmer(Corn_stand ~ Trt_num + Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.cstand5) # AIC: 884.9
+
+model.cstand.best<- glmer(Corn_stand ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+Anova(model.cstand.best, type="III")
 ```
 
 ```{r corn stand trt vs ctrl test assumptions}
@@ -4843,7 +5053,7 @@ resid.model.cstand<- resid(model.cstand.best)
 pred.model.cstand<- predict(model.cstand.best)
 
 # check randomness
-plot(pred.model.cstand, resid.model.cstand, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals") # all along same line
+plot(pred.model.cstand, resid.model.cstand, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
 
 # check normality
 hist(resid.model.cstand, main="Histogram of Residuals", xlab="Corn stand") # almost all same frequency
@@ -4855,7 +5065,7 @@ shapiro.test(resid.model.cstand)
 ```
 
 ```{r corn stand trt vs ctrl means}
-cstandemmeans<- emmeans(model.cstand.best, pairwise ~ Trt_num*Weediness)
+cstandemmeans<- emmeans(model.cstand.best, pairwise ~ Trt_num*Weediness, type="response")
 cstandemmeans
 ```
 
@@ -4863,108 +5073,132 @@ cstandemmeans
 Corn_stand ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep)
 
 *Effects:*
-                  Sum Sq Mean Sq NumDF  DenDF F value    Pr(>F)    
-Trt_num           296.97  59.394     5 129.96  3.2882  0.007894 ** 
-Weediness          64.00  64.000     1 129.96  3.5432  0.062028 .  
-Trt_num:Weediness 545.25 109.050     5 129.96  6.0372 4.662e-05 ***
+                  npar  Sum Sq Mean Sq F value
+Trt_num              5  8.9566  1.7913  1.7913
+Weediness            1  2.0824  2.0824  2.0824
+Trt_num:Weediness    5 18.9081  3.7816  3.7816
+
+                     Chisq Df Pr(>Chisq)    
+(Intercept)       506.0437  1  < 2.2e-16 ***
+Trt_num            26.7986  5  6.243e-05 ***
+Weediness           7.4207  1   0.006448 ** 
+Trt_num:Weediness  18.9143  5   0.001994 ** 
 
 *Assumptions:*
-Good
+Good!
 
 *Means:*
- Trt_num Weediness emmean   SE   df lower.CL upper.CL
- 1       W           23.0 5.27 1.47   -9.509     55.6
- 2       W           22.7 5.27 1.47   -9.842     55.3
- 3       W           28.7 5.27 1.47   -3.842     61.3
- 4       W           29.1 5.27 1.47   -3.426     61.7
- 5       W           31.9 5.27 1.47   -0.676     64.4
- 6       W           28.1 5.27 1.47   -4.426     60.7
- 1       WF          29.0 5.27 1.47   -3.592     61.5
- 2       WF          29.5 5.27 1.47   -3.009     62.1
- 3       WF          29.4 5.27 1.47   -3.176     61.9
- 4       WF          28.7 5.27 1.47   -3.842     61.3
- 5       WF          27.5 5.27 1.47   -5.009     60.1
- 6       WF          27.5 5.27 1.47   -5.092     60.0
+ Trt_num Weediness rate   SE  df asymp.LCL asymp.UCL
+ 1       W         23.4 3.27 Inf      17.7      30.7
+ 2       W         23.0 3.23 Inf      17.5      30.3
+ 3       W         28.6 3.94 Inf      21.8      37.5
+ 4       W         29.0 3.99 Inf      22.1      38.0
+ 5       W         31.5 4.32 Inf      24.1      41.2
+ 6       W         28.1 3.87 Inf      21.4      36.8
+ 1       WF        28.8 3.97 Inf      22.0      37.8
+ 2       WF        29.4 4.04 Inf      22.4      38.5
+ 3       WF        29.2 4.02 Inf      22.3      38.3
+ 4       WF        28.6 3.94 Inf      21.8      37.5
+ 5       WF        27.5 3.80 Inf      21.0      36.1
+ 6       WF        27.4 3.79 Inf      20.9      36.0
  
 *Contrasts:*
-contrast    estimate   SE  df t.ratio p.value
- 1 W - 2 W     0.3333 1.74 123  0.192  1.0000 
- 1 W - 3 W    -5.6667 1.74 123 -3.266  0.0602 
- 1 W - 4 W    -6.0833 1.74 123 -3.506  0.0299 
- 1 W - 5 W    -8.8333 1.74 123 -5.091  0.0001 
- 1 W - 6 W    -5.0833 1.74 123 -2.930  0.1436 
- 1 W - 1 WF   -5.9167 1.74 123 -3.410  0.0398 
- 1 W - 2 WF   -6.5000 1.74 123 -3.746  0.0139 
- 1 W - 3 WF   -6.3333 1.74 123 -3.650  0.0190 
- 1 W - 4 WF   -5.6667 1.74 123 -3.266  0.0602 
- 1 W - 5 WF   -4.5000 1.74 123 -2.594  0.2949 
- 1 W - 6 WF   -4.4167 1.74 123 -2.546  0.3226 
- 2 W - 3 W    -6.0000 1.74 123 -3.458  0.0345 
- 2 W - 4 W    -6.4167 1.74 123 -3.698  0.0163 
- 2 W - 5 W    -9.1667 1.74 123 -5.283  <.0001 
- 2 W - 6 W    -5.4167 1.74 123 -3.122  0.0889 
- 2 W - 1 WF   -6.2500 1.74 123 -3.602  0.0222 
- 2 W - 2 WF   -6.8333 1.74 123 -3.938  0.0073 
- 2 W - 3 WF   -6.6667 1.74 123 -3.842  0.0101 
- 2 W - 4 WF   -6.0000 1.74 123 -3.458  0.0345 
- 2 W - 5 WF   -4.8333 1.74 123 -2.786  0.1993 
- 2 W - 6 WF   -4.7500 1.74 123 -2.738  0.2209 
- 3 W - 4 W    -0.4167 1.74 123 -0.240  1.0000 
- 3 W - 5 W    -3.1667 1.74 123 -1.825  0.8011 
- 3 W - 6 W     0.5833 1.74 123  0.336  1.0000 
- 3 W - 1 WF   -0.2500 1.74 123 -0.144  1.0000 
- 3 W - 2 WF   -0.8333 1.74 123 -0.480  1.0000 
- 3 W - 3 WF   -0.6667 1.74 123 -0.384  1.0000 
- 3 W - 4 WF    0.0000 1.74 123  0.000  1.0000 
- 3 W - 5 WF    1.1667 1.74 123  0.672  0.9999 
- 3 W - 6 WF    1.2500 1.74 123  0.720  0.9999 
- 4 W - 5 W    -2.7500 1.74 123 -1.585  0.9113 
- 4 W - 6 W     1.0000 1.74 123  0.576  1.0000 
- 4 W - 1 WF    0.1667 1.74 123  0.096  1.0000 
- 4 W - 2 WF   -0.4167 1.74 123 -0.240  1.0000 
- 4 W - 3 WF   -0.2500 1.74 123 -0.144  1.0000 
- 4 W - 4 WF    0.4167 1.74 123  0.240  1.0000 
- 4 W - 5 WF    1.5833 1.74 123  0.913  0.9989 
- 4 W - 6 WF    1.6667 1.74 123  0.961  0.9982 
- 5 W - 6 W     3.7500 1.74 123  2.161  0.5804 
- 5 W - 1 WF    2.9167 1.74 123  1.681  0.8734 
- 5 W - 2 WF    2.3333 1.74 123  1.345  0.9713 
- 5 W - 3 WF    2.5000 1.74 123  1.441  0.9528 
- 5 W - 4 WF    3.1667 1.74 123  1.825  0.8011 
- 5 W - 5 WF    4.3333 1.74 123  2.497  0.3515 
- 5 W - 6 WF    4.4167 1.74 123  2.546  0.3226 
- 6 W - 1 WF   -0.8333 1.74 123 -0.480  1.0000 
- 6 W - 2 WF   -1.4167 1.74 123 -0.816  0.9996 
- 6 W - 3 WF   -1.2500 1.74 123 -0.720  0.9999 
- 6 W - 4 WF   -0.5833 1.74 123 -0.336  1.0000 
- 6 W - 5 WF    0.5833 1.74 123  0.336  1.0000 
- 6 W - 6 WF    0.6667 1.74 123  0.384  1.0000 
- 1 WF - 2 WF  -0.5833 1.74 123 -0.336  1.0000 
- 1 WF - 3 WF  -0.4167 1.74 123 -0.240  1.0000 
- 1 WF - 4 WF   0.2500 1.74 123  0.144  1.0000 
- 1 WF - 5 WF   1.4167 1.74 123  0.816  0.9996 
- 1 WF - 6 WF   1.5000 1.74 123  0.865  0.9993 
- 2 WF - 3 WF   0.1667 1.74 123  0.096  1.0000 
- 2 WF - 4 WF   0.8333 1.74 123  0.480  1.0000 
- 2 WF - 5 WF   2.0000 1.74 123  1.153  0.9914 
- 2 WF - 6 WF   2.0833 1.74 123  1.201  0.9880 
- 3 WF - 4 WF   0.6667 1.74 123  0.384  1.0000 
- 3 WF - 5 WF   1.8333 1.74 123  1.057  0.9959 
- 3 WF - 6 WF   1.9167 1.74 123  1.105  0.9940 
- 4 WF - 5 WF   1.1667 1.74 123  0.672  0.9999 
- 4 WF - 6 WF   1.2500 1.74 123  0.720  0.9999 
- 5 WF - 6 WF   0.0833 1.74 123  0.048  1.0000 
+ contrast    ratio     SE  df z.ratio p.value
+ 1 W / 2 W   1.013 0.0826 Inf  0.163  1.0000 
+ 1 W / 3 W   0.817 0.0632 Inf -2.615  0.2708 
+ 1 W / 4 W   0.806 0.0622 Inf -2.796  0.1813 
+ 1 W / 5 W   0.741 0.0561 Inf -3.958  0.0043 *
+ 1 W / 6 W   0.832 0.0647 Inf -2.359  0.4343 
+ 1 W / 1 WF  0.810 0.0626 Inf -2.724  0.2142 
+ 1 W / 2 WF  0.795 0.0612 Inf -2.976  0.1154 
+ 1 W / 3 WF  0.799 0.0616 Inf -2.905  0.1391 
+ 1 W / 4 WF  0.817 0.0632 Inf -2.615  0.2708 
+ 1 W / 5 WF  0.849 0.0663 Inf -2.100  0.6229 
+ 1 W / 6 WF  0.851 0.0665 Inf -2.063  0.6497 
+ 2 W / 3 W   0.806 0.0626 Inf -2.777  0.1899 
+ 2 W / 4 W   0.795 0.0616 Inf -2.958  0.1213 
+ 2 W / 5 W   0.731 0.0556 Inf -4.118  0.0023 *
+ 2 W / 6 W   0.821 0.0641 Inf -2.521  0.3267 
+ 2 W / 1 WF  0.799 0.0620 Inf -2.885  0.1459 
+ 2 W / 2 WF  0.785 0.0606 Inf -3.137  0.0739 
+ 2 W / 3 WF  0.789 0.0610 Inf -3.066  0.0906 
+ 2 W / 4 WF  0.806 0.0626 Inf -2.777  0.1899 
+ 2 W / 5 WF  0.838 0.0656 Inf -2.262  0.5042 
+ 2 W / 6 WF  0.840 0.0659 Inf -2.225  0.5315 
+ 3 W / 4 W   0.987 0.0722 Inf -0.183  1.0000 
+ 3 W / 5 W   0.907 0.0650 Inf -1.360  0.9708 
+ 3 W / 6 W   1.019 0.0752 Inf  0.258  1.0000 
+ 3 W / 1 WF  0.992 0.0727 Inf -0.110  1.0000 
+ 3 W / 2 WF  0.974 0.0710 Inf -0.365  1.0000 
+ 3 W / 3 WF  0.979 0.0715 Inf -0.292  1.0000 
+ 3 W / 4 WF  1.000 0.0734 Inf  0.000  1.0000 
+ 3 W / 5 WF  1.039 0.0770 Inf  0.519  1.0000 
+ 3 W / 6 WF  1.042 0.0773 Inf  0.556  1.0000 
+ 4 W / 5 W   0.919 0.0657 Inf -1.178  0.9906 
+ 4 W / 6 W   1.033 0.0759 Inf  0.441  1.0000 
+ 4 W / 1 WF  1.005 0.0734 Inf  0.073  1.0000 
+ 4 W / 2 WF  0.987 0.0717 Inf -0.182  1.0000 
+ 4 W / 3 WF  0.992 0.0722 Inf -0.109  1.0000 
+ 4 W / 4 WF  1.013 0.0742 Inf  0.183  1.0000 
+ 4 W / 5 WF  1.053 0.0778 Inf  0.702  0.9999 
+ 4 W / 6 WF  1.056 0.0781 Inf  0.739  0.9999 
+ 5 W / 6 W   1.124 0.0810 Inf  1.618  0.9029 
+ 5 W / 1 WF  1.094 0.0782 Inf  1.251  0.9847 
+ 5 W / 2 WF  1.074 0.0764 Inf  0.996  0.9978 
+ 5 W / 3 WF  1.079 0.0769 Inf  1.069  0.9959 
+ 5 W / 4 WF  1.102 0.0790 Inf  1.360  0.9708 
+ 5 W / 5 WF  1.146 0.0830 Inf  1.878  0.7733 
+ 5 W / 6 WF  1.149 0.0833 Inf  1.915  0.7500 
+ 6 W / 1 WF  0.973 0.0716 Inf -0.368  1.0000 
+ 6 W / 2 WF  0.955 0.0700 Inf -0.623  1.0000 
+ 6 W / 3 WF  0.960 0.0705 Inf -0.550  1.0000 
+ 6 W / 4 WF  0.981 0.0724 Inf -0.258  1.0000 
+ 6 W / 5 WF  1.020 0.0759 Inf  0.261  1.0000 
+ 6 W / 6 WF  1.022 0.0762 Inf  0.298  1.0000 
+ 1 WF / 2 WF 0.982 0.0714 Inf -0.255  1.0000 
+ 1 WF / 3 WF 0.987 0.0719 Inf -0.182  1.0000 
+ 1 WF / 4 WF 1.008 0.0739 Inf  0.110  1.0000 
+ 1 WF / 5 WF 1.048 0.0775 Inf  0.629  1.0000 
+ 1 WF / 6 WF 1.051 0.0778 Inf  0.666  1.0000 
+ 2 WF / 3 WF 1.005 0.0729 Inf  0.073  1.0000 
+ 2 WF / 4 WF 1.027 0.0749 Inf  0.365  1.0000 
+ 2 WF / 5 WF 1.067 0.0786 Inf  0.883  0.9993 
+ 2 WF / 6 WF 1.070 0.0789 Inf  0.921  0.9989 
+ 3 WF / 4 WF 1.022 0.0746 Inf  0.292  1.0000 
+ 3 WF / 5 WF 1.062 0.0783 Inf  0.811  0.9997 
+ 3 WF / 6 WF 1.065 0.0786 Inf  0.848  0.9995 
+ 4 WF / 5 WF 1.039 0.0770 Inf  0.519  1.0000 
+ 4 WF / 6 WF 1.042 0.0773 Inf  0.556  1.0000 
+ 5 WF / 6 WF 1.003 0.0751 Inf  0.038  1.0000 
 
 
 ```{r model corn stand trt level, results='hide', message=FALSE, warning=FALSE}
-# first test if treatments are different from control
-model.cstandtrt<- lmer(Corn_stand ~ Trt_plnt * Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt)
-summary(model.cstandtrt)
-anova(model.cstandtrt)
+# first test if treatments are different from each other
+model.cstandtrt1<- glmer(Corn_stand ~ Trt_plnt * Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.cstandtrt1) # AIC: 587.7
 
-## model reduction
-model.cstandtrt.best<- get_model(lmerTest::step(model.cstandtrt, reduce.random=F))
-summary(model.cstandtrt.best)
+model.cstandtrt2<- glmer(Corn_stand ~ Trt_plnt * Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.cstandtrt2) # AIC: 583.5
+
+model.cstandtrt3<- glmer(Corn_stand ~ Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.cstandtrt3) # AIC: 582.5
+
+model.cstandtrt4<- glmer(Corn_stand ~  Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.cstandtrt4) # AIC: 582.7
+
+model.cstandtrt5<- glmer(Corn_stand ~ Trt_plnt + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.cstandtrt5) # AIC: 580.9
+
+model.cstandtrt6<- glmer(Corn_stand ~ Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.cstandtrt6) # AIC: 580.1
+
+model.cstandtrt7<- glmer(Corn_stand ~ Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.cstandtrt7) # AIC: 579.8
+
+model.cstandtrt8<- glmer(Corn_stand ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.cstandtrt8) # AIC: 578.9
+
+model.cstandtrt.best<- glmer(Corn_stand ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
 anova(model.cstandtrt.best)
 ```
 
@@ -4992,7 +5226,7 @@ shapiro.test(resid.model.cstandt)
 Corn_stand ~ (1 | Year/Rep) + (1 | Location/Rep)
 
 *Effects:*
-
+None
 
 *Assumptions:*
 Fine
@@ -5073,10 +5307,13 @@ htmean
 Corn_ht_av ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep)
 
 *Effects:*
-
+                   Sum Sq Mean Sq NumDF  DenDF F value    Pr(>F)    
+Trt_num            527.39  105.48     5 125.83  2.6424   0.02624 *  
+Weediness          965.65  965.65     1 125.83 24.1911 2.670e-06 ***
+Trt_num:Weediness 1919.95  383.99     5 125.83  9.6195 8.541e-08 ***
 
 *Assumptions:*
-Fine
+Good
 
 *Means:*
  Trt_num Weediness emmean   SE   df lower.CL upper.CL
@@ -5175,7 +5412,7 @@ summary(model.httrt.best)
 anova(model.httrt.best)
 ```
 
-```{r corn height model assumptions, results='hide', message=FALSE, warning=FALSE}
+```{r corn height trt level model assumptions, results='hide', message=FALSE, warning=FALSE}
 # check residuals
 resid.model.httrt<- resid(model.httrt.best)
 pred.model.httrt<- predict(model.httrt.best)
@@ -5251,29 +5488,169 @@ None
 
 ### corn injury
 
+```{r corn injury data manipulation}
+# use dir
+# convert mortality data to long form
+dirinj <- dir %>%
+  gather(key = "time", value = "injury", Injury_14DAE,Injury_21DAE,Injury_28DAE) %>%
+  convert_as_factor(Plot, time)
+# arrange mortality time in order
+dirinj$time<- factor(dirinj$time, levels = c("Injury_14DAT","Injury_21DAT","Injury_28DAT")) 
+
+dirinjtrt<- dirtrt %>%
+  gather(key = "time", value = "injury", Injury_14DAE,Injury_21DAE,Injury_28DAE) %>%
+  convert_as_factor(Plot, time)
+# arrange mortality time in order
+dirinjtrt$time<- factor(dirinjtrt$time, levels = c("Injury_14DAT","Injury_21DAT","Injury_28DAT")) 
+```
+
 ```{r plot corn injury, results='hide', message=FALSE, warning=FALSE}
 
 ```
 
-```{r plot corn injury rep effect, results='hide', message=FALSE, warning=FALSE}
+```{r model corn injury trt vs ctrl, results='hide', message=FALSE, warning=FALSE}
+model.inj1<- glmer(injury ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
+summary(model.inj1) # AIC: 6883.6
 
+model.inj2<- glmer(injury ~ Trt_num + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
+summary(model.inj2) # AIC: 6930.4
+
+model.inj3<- glmer(injury ~  Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
+summary(model.inj3) # AIC: 6988.6
+
+model.inj4<- glmer(injury ~ 1 + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
+summary(model.inj4) # AIC: 6994.8
+
+model.inj5<- glmer(injury ~ Trt_num + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
+summary(model.inj5) # AIC: 6924.2
+
+model.inj.best<- glmer(injury ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
+Anova(model.inj1, type="III")
 ```
 
-```{r model corn injury trt vs control, results='hide', message=FALSE, warning=FALSE}
+```{r model corn injury trt vs ctrl assumptions}
+# check residuals
+resid.model.inj<- resid(model.inj.best)
+pred.model.inj<- predict(model.inj.best)
 
+# check randomness
+plot(pred.model.inj, resid.model.inj, ylab="Residuals", xlab="Corn injury", main="Predictecd vs Residuals") 
+
+# check normality
+hist(resid.model.inj, main="Histogram of Residuals", xlab="Corn ht")
+
+qqnorm(resid.model.inj) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.inj)
 ```
+
+```{r corn injury trt vs ctrl means}
+injemmeans<- emmeans(model.inj.best, pairwise ~ Trt_num*Weediness, type="reponse")
+injemmeans
+```
+*Best Model:*
+injury ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot)
+
+*Effects:*
+                   Chisq Df Pr(>Chisq)    
+(Intercept)       45.541  1  1.495e-11 ***
+Trt_num           97.091  5  < 2.2e-16 ***
+Weediness         15.812  1  6.997e-05 ***
+Trt_num:Weediness 50.460  5  1.116e-09 ***
+
+*Assumptions:*
+okay
+
+*Means:*
+ Trt_num Weediness emmean   SE  df asymp.LCL asymp.UCL
+ 1       W           3.51 0.52 Inf      2.49      4.53
+ 2       W           3.68 0.52 Inf      2.66      4.70
+ 3       W           3.27 0.52 Inf      2.25      4.29
+ 4       W           3.65 0.52 Inf      2.63      4.67
+ 5       W           3.42 0.52 Inf      2.40      4.44
+ 6       W           3.33 0.52 Inf      2.31      4.35
+ 1       WF          3.35 0.52 Inf      2.33      4.37
+ 2       WF          3.48 0.52 Inf      2.47      4.50
+ 3       WF          3.43 0.52 Inf      2.41      4.45
+ 4       WF          3.59 0.52 Inf      2.57      4.61
+ 5       WF          3.44 0.52 Inf      2.42      4.46
+ 6       WF          3.33 0.52 Inf      2.31      4.34
+
 
 ```{r model corn injury trt level, results='hide', message=FALSE, warning=FALSE}
+model.injtrt1<- glmer(injury ~ Trt_crmp * Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt1) # AIC: 2327.6
 
+model.injtrt2<- glmer(injury ~ Trt_crmp * Trt_plnt + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt2) # AIC: 2336.1
+
+model.injtrt3<- glmer(injury ~ Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt3) # AIC: 6970.9
+
+model.injtrt4<- glmer(injury ~ Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt4) # AIC: 2360.1
+
+model.injtrt5<- glmer(injury ~ Trt_crmp + Trt_plnt + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt5) # AIC: 2360.9
+
+model.injtrt6<- glmer(injury ~ Trt_crmp * Trt_plnt + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt6) # AIC: 2336.5
+
+model.injtrt7<- glmer(injury ~ Trt_crmp + Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt7) # AIC: 2362.1
+
+model.injtrt8<- glmer(injury ~ Trt_crmp * Weediness + Trt_plnt + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt8) # AIC: 2354.6
+
+model.injtrt.best<- glmer(injury ~ Trt_crmp * Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
+Anova(model.inj.best, type="III")
 ```
 
-```{r corn injury model assumptions, results='hide', message=FALSE, warning=FALSE}
+```{r model corn injury trt level assumptions}
+# check residuals
+resid.model.injtrt<- resid(model.injtrt.best)
+pred.model.injtrt<- predict(model.injtrt.best)
 
+# check randomness
+plot(pred.model.injtrt, resid.model.injtrt, ylab="Residuals", xlab="Corn injury", main="Predictecd vs Residuals") 
+
+# check normality
+hist(resid.model.injtrt, main="Histogram of Residuals", xlab="Corn ht")
+
+qqnorm(resid.model.injtrt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.injtrt)
 ```
 
 ```{r corn injury difference of means, results='hide', message=FALSE, warning=FALSE}
-# 
+injtrtemmeans<- emmeans(model.injtrt.best, pairwise ~ Trt_crmp*Trt_plnt*Weediness, type="response")
+injtrtemmeans
 ```
+*Best Model:*
+injury ~ Trt_crmp + Trt_plnt + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot) + Trt_crmp : Trt_plnt : Weediness + Trt_crmp : Trt_plnt + Trt_crmp : Weediness + Trt_plnt : Weediness
+
+*Effects:*
+                   Chisq Df Pr(>Chisq)    
+(Intercept)       45.541  1  1.495e-11 ***
+Trt_num           97.091  5  < 2.2e-16 ***
+Weediness         15.812  1  6.997e-05 ***
+Trt_num:Weediness 50.460  5  1.116e-09 ***
+
+*Assumptions:*
+Fine
+
+*Means:*
+ Trt_crmp Trt_plnt Weediness rate   SE  df asymp.LCL asymp.UCL
+ E        E        W         29.8 18.2 Inf      9.04      98.5
+ N        E        W         36.2 22.1 Inf     10.96     119.5
+ E        N        W         38.0 23.1 Inf     11.51     125.4
+ N        N        W         28.3 17.2 Inf      8.56      93.3
+ E        E        WF        29.7 18.1 Inf      8.99      98.0
+ N        E        WF        36.9 22.5 Inf     11.19     122.0
+ E        N        WF        35.9 21.9 Inf     10.88     118.5
+ N        N        WF        33.3 20.3 Inf     10.09     109.9
 
 
 ### corn tasseling
@@ -5313,76 +5690,151 @@ print(mcount)
 # weed-free higher in all cases, no other trends evident
 ```
 
-```{r plot corn marketable yield rep effect, results='hide', message=FALSE, warning=FALSE}
-mcountrep<- ggplot(dir4, aes(x = Rep, y = count)) +
-          geom_boxplot() +
-          theme_bw()
-print(mcountrep)
-# no apparent rep effects
-
-# anova of reps to determine if statistically different
-mcountrep<- anova_test(count ~ Rep, data=dir4)
-mcountrep
-# not significant
-```
-
 ```{r model corn marketable count trt vs control}
 # first test if treatments are different from control
-model.mcount1<- lmer(count ~ Trt_num * weediness + ( 1 | Rep), data=dir4)
-summary(model.mcount1)
-anova(model.mcount1)
+model.mcount1<- glmer(M_count ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.mcount1) # AIC: 1057.3
 
-## model reduction
-model.mcount1.best<- get_model(lmerTest::step(model.mcount1, reduce.random=F))
-summary(model.mcount1.best)
-anova(model.mcount1.best)
-### best model: count ~ Trt_num * weediness + (1 | Rep)
+model.mcount2<- glmer(M_count ~ Trt_num + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.mcount2) # AIC: 2011.0
 
-mcountmean1<- emmeans(model.mcount1.best, pairwise ~ Trt_num*weediness)
-mcountmean1
-# weedy control 1 lower than weedy trt5
-# weedy control 2 lower than weedy trt 3, 5, 6
-# weed free ctrl 1 & 2 not diff from wf trts
+model.mcount3<- glmer(M_count ~  Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.mcount3) # AIC: 1244.1
 
-plot(mcountmean1)
+model.mcount4<- glmer(M_count ~ Trt_num + Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.mcount4) # AIC: 1246.7
+
+model.mcount5<- glmer(M_count ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.mcount5) # AIC: 2008.4
+
+model.mcount.best<- glmer(M_count ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+Anova(model.mcount.best, type="III")
 ```
 
-```{r model corn marketable count trt level, results='hide', message=FALSE, warning=FALSE}
-# test if treatments are different from each other
-model.mcount2<- lmer(count ~ Trt_plnt * Trt_crmp * weediness + ( 1 | Rep), data=dir4trt)
-summary(model.mcount2)
-anova(model.mcount2)
-
-## model reduction
-model.mcount2.best<- get_model(lmerTest::step(model.mcount2, reduce.random=F))
-summary(model.mcount2.best)
-anova(model.mcount2.best)
-### best model: count ~ weediness + (1 | Rep)
-```
-
-```{r corn marketable count model assumptions, results='hide', message=FALSE, warning=FALSE}
+```{r model corn marketable count trt vs ctrl assumptions}
 # check residuals
-resid.model.mcount<- resid(model.mcount2.best)
-pred.model.mcount<- predict(model.mcount2.best)
+resid.model.M<- resid(model.mcount.best)
+pred.model.M<- predict(model.mcount.best)
 
 # check randomness
-plot(pred.model.mcount, resid.model.mcount, ylab="Residuals", xlab="Corn marketable count", main="Predictecd vs Residuals") # divided in 2
+plot(pred.model.M, resid.model.M, ylab="Residuals", xlab="Corn M count", main="Predictecd vs Residuals") 
 
 # check normality
-hist(resid.model.mcount, main="Histogram of Residuals", xlab="Corn marketable count") 
+hist(resid.model.M, main="Histogram of Residuals", xlab="Corn M count")
 
-qqnorm(resid.model.mcount) 
+qqnorm(resid.model.M) 
 
 # Shapiro-Wilk test
-shapiro.test(resid.model.mcount)
-# test assumptions met
+shapiro.test(resid.model.M)
 ```
 
-```{r corn marketable count difference of means}
-mcountmean2<- emmeans(model.mcount2.best, pairwise ~ weediness)
-mcountmean2
-# 8.69 more marketable cobs in weed-free than weedy
+```{r marketable count trt vs ctrl means}
+memmeans<- emmeans(model.mcount.best, pairwise ~ Trt_num*Weediness, type="response")
+memmeans
 ```
+
+*Best Model:*
+M_count ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+                     Chisq Df Pr(>Chisq)    
+(Intercept)         0.2748  1     0.6001    
+Trt_num           101.5345  5     <2e-16 ***
+Weediness         142.8388  1     <2e-16 ***
+Trt_num:Weediness 128.3931  5     <2e-16 ***
+
+*Assumptions:*
+possible upper outlier, otherwise fine
+
+*Means:*
+ Trt_num Weediness  rate    SE  df asymp.LCL asymp.UCL
+ 1       W          1.17 0.361 Inf     0.643      2.14
+ 2       W          1.72 0.466 Inf     1.014      2.93
+ 3       W          8.07 1.561 Inf     5.522     11.79
+ 4       W          6.74 1.336 Inf     4.566      9.94
+ 5       W          7.75 1.508 Inf     5.297     11.35
+ 6       W          9.01 1.719 Inf     6.197     13.09
+ 1       WF        27.41 4.793 Inf    19.458     38.62
+ 2       WF        26.39 4.623 Inf    18.724     37.21
+ 3       WF        20.13 3.579 Inf    14.206     28.52
+ 4       WF        17.78 3.186 Inf    12.513     25.26
+ 5       WF        18.80 3.356 Inf    13.246     26.67
+ 6       WF        20.44 3.631 Inf    14.432     28.95
+
+
+```{r model corn marketable count trts}
+# first test if treatments are different from control
+model.mcounttrt1<- glmer(M_count ~ Trt_plnt * Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrt1) # AIC: 739.8
+
+model.mcounttrt2<- glmer(M_count ~ Trt_plnt * Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrt2) # AIC: 984.4
+
+model.mcounttrt3<- glmer(M_count ~  Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrt3) # AIC: 737.3
+
+model.mcounttrt4<- glmer(M_count ~ Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrt4) # AIC: 739.0
+
+model.mcounttrt5<- glmer(M_count ~ Trt_plnt + Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrt5) # AIC: 735.8
+
+model.mcounttrt6<- glmer(M_count ~ Trt_plnt + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrt6) # AIC: 985.6
+
+model.mcounttrt7<- glmer(M_count ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrt7) # AIC: 984.9
+
+model.mcounttrt8<- glmer(M_count ~ Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrt8) # AIC: 735.1 -> best
+
+model.mcounttrt9<- glmer(M_count ~ Trt_plnt + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrt9) # AIC: 985.6
+
+model.mcounttrt.best<- glmer(M_count ~ Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+Anova(model.mcounttrt.best, type="III")
+```
+
+```{r model corn marketable count trt vs ctrl assumptions}
+# check residuals
+resid.model.Mtrt<- resid(model.mcounttrt.best)
+pred.model.Mtrt<- predict(model.mcounttrt.best)
+
+# check randomness
+plot(pred.model.Mtrt, resid.model.Mtrt, ylab="Residuals", xlab="Corn M count", main="Predictecd vs Residuals") 
+
+# check normality
+hist(resid.model.Mtrt, main="Histogram of Residuals", xlab="Corn M count")
+
+qqnorm(resid.model.Mtrt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.Mtrt)
+```
+
+```{r marketable count trt vs ctrl means}
+mtrtemmeans<- emmeans(model.mcounttrt.best, pairwise ~ Weediness, type="response")
+mtrtemmeans
+```
+*Best Model:*
+M_count ~  Weediness + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+             Chisq Df Pr(>Chisq)    
+(Intercept) 108.93  1  < 2.2e-16 ***
+Weediness   228.68  1  < 2.2e-16 ***
+
+*Assumptions:*
+couple blips in hist but otherwise good
+
+*Means:*
+ Weediness  rate   SE  df asymp.LCL asymp.UCL
+ W          7.94 1.58 Inf      5.38      11.7
+ WF        19.41 3.78 Inf     13.25      28.4
+ 
+*Comparisons:*
+ contrast ratio     SE  df z.ratio p.value
+ W / WF   0.409 0.0242 Inf -15.122 <.0001 *
 
 
 ### corn marketable weight

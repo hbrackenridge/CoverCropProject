@@ -126,7 +126,7 @@ The data was subsetted to only include the treatment Nitrogen = 1X
 
 
 ## Analysis
-
+### preamble
 For each variable, a graph was created plotting the variable against cultivar, coloured by seeding rate, and facetted by location & year. This was to get a general sense of the trends in the data & look for any anomalies or potential errors.
 
 From there, a full model was created with cultivar, seeding rate, and location as fixed effects, and rep & year as random effects to test whether the treatments were different from the control. 
@@ -3999,7 +3999,139 @@ Wplot2<- ggplot(Wtable, aes(x=Time, y=Sum, colour=factor(SR), shape=factor(Cult)
 print(Wplot2)
 ```
 
-```{r weed count analysis -- model selection}
+```{r weed count analysis trts vs ctrl -- glmer model selection}
+# weed count models
+## count data so glmer used with poisson distribution
+### since repeated measures, plot added as random effect within year & location
+
+# manual model reduction
+
+# Trt_num * Time
+model.weedcount1<- glmer(Count ~ Trt_num * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount1) # AIC: 44719
+# Cult * SR
+model.weedcount2<- glmer(Count ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount2) # AIC: 48349.9
+# Cult * Time
+model.weedcount3<- glmer(Count ~ Cult * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount3) # AIC: 44769.9
+# SR * Time
+model.weedcount4<- glmer(Count ~ SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount4) # AIC: 44791.2
+# Cult + SR + Time
+model.weedcount5<- glmer(Count ~ Cult + SR + Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount5) # AIC: 44800.0
+# Cult + SR * Time
+model.weedcount6<- glmer(Count ~ Cult + SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount6) # AIC: 44790.2
+# Cult * SR + Time
+model.weedcount7<- glmer(Count ~ Cult * SR + Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount7) # AIC: 44804.0
+# no effects
+model.weedcount8<- glmer(Count ~ 1 + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson)
+summary(model.weedcount8) # AIC: 60014.3
+
+# best model: glmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot)
+```
+
+```{r weed count analysis -- lmer model, assumptions & means}
+model.weedcount<- lmer(Count ~ Trt_num * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat)
+
+model.weedcount.best<- get_model(lmerTest::step(model.weedcount, reduce.random=F))
+summary(model.weedcount.best)
+anova(model.weedcount.best)
+
+# check residuals
+resid.model.wcount<- resid(model.weedcount.best)
+pred.model.wcount<- predict(model.weedcount.best)
+
+# check randomness
+plot(pred.model.wcount, resid.model.wcount, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
+# weird trend
+
+# check normality
+hist(resid.model.wcount, main="Histogram of Residuals", xlab="weed counts", )
+# long tails on right
+
+qqnorm(resid.model.wcount) # curvy shape
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.wcount)
+# assumptions not met, needs transformations? Or not using right format of data?
+
+# transform -- log
+
+model.weedcountlog<- lmer(log(Count) ~ Trt_num * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat)
+
+model.weedcountlog.best<- get_model(lmerTest::step(model.weedcountlog, reduce.random=F))
+summary(model.weedcountlog.best)
+anova(model.weedcountlog.best)
+
+# check residuals
+resid.model.wcountlog<- resid(model.weedcountlog.best)
+pred.model.wcountlog<- predict(model.weedcountlog.best)
+
+# check randomness
+plot(pred.model.wcountlog, resid.model.wcountlog, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
+# weird trend
+
+# check normality
+hist(resid.model.wcountlog, main="Histogram of Residuals", xlab="weed counts", )
+# long tails on right
+
+qqnorm(resid.model.wcountlog) # curvy shape
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.wcountlog)
+
+#  means
+wcountemmeans1<- emmeans(model.weedcountlog.best, pairwise ~ Trt_num, type="response")
+wcountemmeans1
+plot(wcountemmeans1)
+
+wcountemmeans2<- emmeans(model.weedcountlog.best, pairwise ~ Time, type="response")
+wcountemmeans2
+plot(wcountemmeans2)
+```
+*Best Model:*
+log(Count) ~ Trt_num + Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot)
+
+*Effects:*
+         Sum Sq Mean Sq NumDF   DenDF F value  Pr(>F)    
+Trt_num  32.595   3.260    10  121.12  2.4105 0.01194 *  
+Time    182.070  91.035     2 2989.03 67.3227 < 2e-16 ***
+
+*Assumptions:*
+Bad -- log transformed -- better, still not great
+
+*Means:*
+ Trt_num response    SE  df asymp.LCL asymp.UCL
+ 1           3.84 0.771 Inf     2.587      5.69
+ 2           3.87 0.783 Inf     2.608      5.76
+ 3           2.95 0.598 Inf     1.979      4.39
+ 4           3.35 0.685 Inf     2.247      5.00
+ 5           4.03 0.821 Inf     2.703      6.01
+ 6           3.56 0.730 Inf     2.386      5.32
+ 7           3.44 0.705 Inf     2.303      5.14
+ 8           2.46 0.719 Inf     1.390      4.37
+ 9           4.89 5.848 Inf     0.470     50.92
+ 10          1.63 1.949 Inf     0.157     16.97
+ 11          1.69 0.512 Inf     0.934      3.06
+ 
+  Time  response    SE  df asymp.LCL asymp.UCL
+ 28DAT     2.23 0.552 Inf      1.37      3.62
+ 56DAT     3.33 0.831 Inf      2.04      5.43
+ PRE       3.96 0.983 Inf      2.43      6.44
+ 
+*Contrasts:*
+
+ contrast      ratio     SE  df z.ratio p.value
+ 28DAT / 56DAT 0.670 0.0363 Inf  -7.396 <.0001 *
+ 28DAT / PRE   0.563 0.0283 Inf -11.424 <.0001 *
+ 56DAT / PRE   0.841 0.0444 Inf  -3.279 0.0030 *
+ 
+
+```{r weed count analysis trts -- glmer model selection}
 # weed count models
 ## count data so glmer used with poisson distribution
 ### since repeated measures, plot added as random effect within year & location
@@ -4034,82 +4166,98 @@ summary(model.weedcount8) # AIC: 60014.3
 # best model: glmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot)
 ```
 
-```{r weed count analysis -- assumptions & means}
-model.weedcount.best<- glmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdat, family=poisson(link="log"))
-Anova(model.weedcount.best, type="III")
+```{r weed count analysis -- lmer model, assumptions & means}
+model.weedcounttrt<- lmer(Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdattrt)
+
+model.weedcounttrt.best<- get_model(lmerTest::step(model.weedcounttrt, reduce.random=F))
+summary(model.weedcounttrt.best)
+anova(model.weedcount.best)
 
 # check residuals
-resid.model.wcount<- resid(model.weedcount.best)
-pred.model.wcount<- predict(model.weedcount.best)
+resid.model.wcounttrt<- resid(model.weedcounttrt.best)
+pred.model.wcounttrt<- predict(model.weedcounttrt.best)
 
 # check randomness
-plot(pred.model.wcount, resid.model.wcount, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
+plot(pred.model.wcounttrt, resid.model.wcounttrt, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
 # weird trend
 
 # check normality
-hist(resid.model.wcount, main="Histogram of Residuals", xlab="weed counts", )
+hist(resid.model.wcounttrt, main="Histogram of Residuals", xlab="weed counts", )
 # long tails on right
 
-qqnorm(resid.model.wcount) # curvy shape
+qqnorm(resid.model.wcounttrt) # curvy shape
 
 # Shapiro-Wilk test
-shapiro.test(resid.model.wcount)
+shapiro.test(resid.model.wcounttrt)
+# assumptions not met, needs transformations? Or not using right format of data?
+
+# log transform
+
+model.weedcounttrtlog<- lmer(log(Count) ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot), data=wdattrt)
+
+model.weedcounttrtlog.best<- get_model(lmerTest::step(model.weedcounttrtlog, reduce.random=F))
+summary(model.weedcounttrtlog.best)
+anova(model.weedcountlog.best)
+
+# check residuals
+resid.model.wcounttrtlog<- resid(model.weedcounttrtlog.best)
+pred.model.wcounttrtlog<- predict(model.weedcounttrtlog.best)
+
+# check randomness
+plot(pred.model.wcounttrtlog, resid.model.wcounttrtlog, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
+# weird trend
+
+# check normality
+hist(resid.model.wcounttrtlog, main="Histogram of Residuals", xlab="weed counts", )
+# long tails on right
+
+qqnorm(resid.model.wcounttrtlog) # curvy shape
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.wcounttrtlog)
 # assumptions not met, needs transformations? Or not using right format of data?
 
 #  means
-wcountemmeans<- emmeans(model.weedcount.best, pairwise ~ Cult*SR*Time, type="response")
-wcountemmeans
+wcountemmeans1<- emmeans(model.weedcounttrtlog.best, pairwise ~ Time, type="response")
+wcountemmeans1
+plot(wcountemmeans1)
+
+wcountemmeans2<- emmeans(model.weedcounttrtlog.best, pairwise ~ SR, type="response")
+wcountemmeans2
 plot(wcountemmeans)
 ```
 *Best Model:*
-Count ~ Cult * SR * Time + (1 | Year / Rep) + (1 | Location / Rep) + (1 | Year:Location:Plot)
+log(Count) ~ SR + Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot)
 
 *Effects:*
-             npar  Sum Sq Mean Sq   F value
-Cult            1    3.02    3.02    3.0199
-SR              2    3.30    1.65    1.6517
-Time            2 3062.51 1531.25 1531.2546
-Cult:SR         2    0.09    0.04    0.0435
-Cult:Time       2   34.18   17.09   17.0881
-SR:Time         4   17.92    4.48    4.4808
-Cult:SR:Time    4   51.41   12.85   12.8536
-
-                Chisq Df Pr(>Chisq)    
-(Intercept)   15.7688  1  7.157e-05 ***
-Cult           0.9423  1     0.3317    
-SR             2.7427  2     0.2538    
-Time         677.0624  2  < 2.2e-16 ***
-Cult:SR        1.1116  2     0.5736    
-Cult:Time     31.6768  2  1.323e-07 ***
-SR:Time       23.9742  4  8.083e-05 ***
-Cult:SR:Time  51.5960  4  1.676e-10 ***
+         Sum Sq Mean Sq NumDF   DenDF F value  Pr(>F)    
+Trt_num  32.595   3.260    10  121.12  2.4105 0.01194 *  
+Time    182.070  91.035     2 2989.03 67.3227 < 2e-16 ***
 
 *Assumptions:*
-Bad
+Bad -- log transformed -- better
 
 *Means:*
- Cult     SR  Time   rate    SE  df asymp.LCL asymp.UCL
- Early    150 28DAT  4.62 1.783 Inf     2.172      9.85
- Standard 150 28DAT  3.73 1.428 Inf     1.763      7.90
- Early    300 28DAT  3.57 1.381 Inf     1.675      7.62
- Standard 300 28DAT  2.12 0.817 Inf     0.996      4.51
- Early    600 28DAT  3.19 1.236 Inf     1.496      6.82
- Standard 600 28DAT  2.47 0.946 Inf     1.169      5.23
- Early    150 56DAT  8.21 3.161 Inf     3.861     17.46
- Standard 150 56DAT  8.25 3.149 Inf     3.904     17.43
- Early    300 56DAT  5.97 2.301 Inf     2.801     12.70
- Standard 300 56DAT  6.04 2.308 Inf     2.856     12.77
- Early    600 56DAT  7.20 2.774 Inf     3.380     15.32
- Standard 600 56DAT  5.13 1.952 Inf     2.433     10.81
- Early    150 PRE   12.77 4.909 Inf     6.008     27.12
- Standard 150 PRE    9.92 3.785 Inf     4.700     20.96
- Early    300 PRE   10.31 3.967 Inf     4.847     21.91
- Standard 300 PRE    7.74 2.955 Inf     3.666     16.36
- Early    600 PRE    9.94 3.825 Inf     4.673     21.13
- Standard 600 PRE    8.09 3.074 Inf     3.844     17.04
+ Time  response    SE   df lower.CL upper.CL
+ 28DAT     2.42 0.505 2.37     1.11     5.26
+ 56DAT     3.72 0.782 2.40     1.72     8.06
+ PRE       4.55 0.949 2.33     2.08     9.98
+ 
+ SR  response    SE   df lower.CL upper.CL
+ 150     3.93 0.827 2.43     1.82     8.47
+ 300     3.20 0.675 2.45     1.49     6.87
+ 600     3.26 0.688 2.46     1.52     7.00
 
 *Comparisons:*
-
+ contrast      ratio     SE   df t.ratio p.value
+ 28DAT / 56DAT 0.649 0.0389 2439  -7.207 <.0001 *
+ 28DAT / PRE   0.531 0.0295 2481 -11.410 <.0001 *
+ 56DAT / PRE   0.818 0.0472 2454  -3.486 0.0014 *
+ 
+ contrast  ratio     SE  df t.ratio p.value
+ 150 / 300 1.229 0.0907 112  2.793  0.0168 *
+ 150 / 600 1.206 0.0889 120  2.535  0.0333 *
+ 300 / 600 0.981 0.0736 129 -0.254  0.9650 
 
 
 #### Biomass
@@ -4416,10 +4564,7 @@ Not met --> log transformed --> better but not great
  150 / 300  1.19 0.110 903 1.865   0.1497 
  150 / 600  1.25 0.119 906 2.321   0.0535 *
  300 / 600  1.05 0.101 905 0.499   0.8718 
-
-
-
-
+ 
 
 ### Correlation of rye biomass & weed biomass
 
@@ -4576,6 +4721,7 @@ dirmaintrt<- subset(dirmain, !is.na(dirmain$Trt_plnt)) # dirmaintrt contains onl
 ```{r dir weeds data}
 # second dataset containing weeds data
 dirw<- read.csv("DIR_Weeds.csv")
+str(dirw)
 dirw$Rep<- as.factor(dirw$Rep)
 dirw$Trt_num<- as.factor(dirw$Trt_num)
 ```
@@ -4595,6 +4741,7 @@ library(cAIC4, quietly = TRUE)
 ```
 
 ## analysis
+### preamble
 
 For each variable, a graph was created plotting the variable against rye planting direction & crimping direction (if applicable). This was to get a general sense of the trends in the data & look for any anomalies or potential errors.
 
@@ -4685,6 +4832,7 @@ Fine
 
 *Means:*
 None
+
 
 ### rye biomass
 
@@ -4872,6 +5020,74 @@ Not great
  N        N        Pop_7DAT  124.2 30.46 Inf      76.8     200.9
 
 
+```{r model rye pop ups -- orientation}
+model.popo1<- glmer(popups ~ Orientation * time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+summary(model.popo1) # AIC: 10902.2
+
+model.popo2<- glmer(popups ~ Orientation + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+summary(model.popo2) # AIC: 16549.6
+
+model.popo3<- glmer(popups ~ time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+summary(model.popo3) # AIC: 11438.3
+
+model.popo4<- glmer(popups ~ 1 + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+summary(model.popo4) # AIC: 16547.7
+
+model.popo.best<- glmer(popups ~ Orientation * time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirpop, family=poisson(link="log"))
+
+Anova(model.popo.best, type="III")
+```
+
+```{r rye pop up model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.popo<- resid(model.popo.best)
+pred.model.popo<- predict(model.popo.best)
+
+# check randomness
+plot(pred.model.popo, resid.model.popo, ylab="Residuals", xlab="Rye pop ups", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.popo, main="Histogram of Residuals", xlab="Rye pop  ups") 
+
+qqnorm(resid.model.pop) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.popo)
+# test assumptions not great but acceptable
+```
+
+```{r rye pop ups difference of means}
+popomean<- emmeans(model.popo.best, pairwise ~ Orientation*time, type="response")
+popomean
+plot(popomean)
+```
+*Best Model:*
+popups ~ Orientation * time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot)
+
+*Effects:*
+                    Chisq Df Pr(>Chisq)    
+(Intercept)       306.170  1  < 2.2e-16 ***
+Orientation        32.258  1   1.35e-08 ***
+time             1544.185  4  < 2.2e-16 ***
+Orientation:time  511.820  4  < 2.2e-16 ***
+
+*Assumptions:*
+acceptable
+
+*Means:*
+ Orientation time       rate    SE  df asymp.LCL asymp.UCL
+ O           Pop_0DAT   53.7 12.22 Inf      34.4      83.8
+ P           Pop_0DAT   24.5  5.61 Inf      15.6      38.4
+ O           Pop_14DAt 106.3 24.12 Inf      68.1     165.8
+ P           Pop_14DAt 127.1 28.84 Inf      81.5     198.3
+ O           Pop_21DAT 106.1 24.07 Inf      68.0     165.5
+ P           Pop_21DAT  98.9 22.44 Inf      63.4     154.3
+ O           Pop_28DAT  76.7 17.42 Inf      49.2     119.7
+ P           Pop_28DAT  84.9 19.27 Inf      54.4     132.5
+ O           Pop_7DAT  129.5 29.37 Inf      83.0     202.0
+ P           Pop_7DAT  139.1 31.56 Inf      89.2     217.0
+ 
+ 
 ### rye mortality
 
 ```{r mortality data modifications, results='hide', message=FALSE, warning=FALSE}
@@ -4997,6 +5213,71 @@ Fine
  N        E        Mort_28DAT 90.6 3.59 Inf      83.8      97.9
  E        N        Mort_28DAT 91.1 3.60 Inf      84.3      98.4
  N        N        Mort_28DAT 91.4 3.61 Inf      84.6      98.8
+
+
+```{r model rye mortality -- orientation}
+model.morto1<- glmer(mort ~ Orientation*time + (1 | Year/Rep) + (1 | Location/Rep), data=dirmort, family=poisson(link="log"))
+summary(model.morto1) # AIC: 3510.8
+
+model.morto2<- glmer(mort ~ Orientation + (1 | Year/Rep) + (1 | Location/Rep), data=dirmort, family=poisson(link="log"))
+summary(model.morto2) # AIC: 8762.9
+
+model.morto3<- glmer(mort ~ time + (1 | Year/Rep) + (1 | Location/Rep), data=dirmort, family=poisson(link="log"))
+summary(model.morto3) # AIC: 3517.4
+
+model.morto4<- glmer(mort ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dirmort, family=poisson(link="log"))
+summary(model.morto4) # AIC: 8766.6
+
+model.morto.best<- glmer(mort ~ Orientation*time + (1 | Year/Rep) + (1 | Location/Rep), data=dirmort, family=poisson(link="log"))
+Anova(model.morto.best, type="III")
+```
+
+```{r rye mortality model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.morto<- resid(model.morto.best)
+pred.model.morto<- predict(model.morto.best)
+
+# check randomness
+plot(pred.model.morto, resid.model.morto, ylab="Residuals", xlab="Rye mortality", main="Predictecd vs Residuals") # some divide
+
+# check normality
+hist(resid.model.morto, main="Histogram of Residuals", xlab="Rye mortality") 
+
+qqnorm(resid.model.morto) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.morto)
+# test assumptions not great
+```
+
+```{r rye mortality difference of means}
+mortomean<- emmeans(model.morto.best, pairwise ~ Orientation*time, type="response")
+mortomean
+plot(mortomean)
+```
+*Best Model:*
+mort ~ Orientation*time + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+                     Chisq Df Pr(>Chisq)    
+(Intercept)      4691.6466  1    < 2e-16 ***
+Orientation         1.7142  1    0.19044    
+time             1933.4906  3    < 2e-16 ***
+Orientation:time    8.8646  3    0.03115 * 
+
+*Assumptions:*
+Randomness divided & patterned, hist not bell shaped (squarish?)
+
+*Means:*
+ Orientation time       rate    SE  df asymp.LCL asymp.UCL
+ O           Mort_7DAT  22.1 0.997 Inf      20.2      24.1
+ P           Mort_7DAT  20.8 0.954 Inf      19.1      22.8
+ O           Mort_14DAT 59.3 2.265 Inf      55.0      63.9
+ P           Mort_14DAT 54.0 2.086 Inf      50.0      58.2
+ O           Mort_21DAT 82.8 3.055 Inf      77.0      89.0
+ P           Mort_21DAT 81.4 3.007 Inf      75.7      87.5
+ O           Mort_28DAT 90.8 3.325 Inf      84.5      97.6
+ P           Mort_28DAT 91.2 3.336 Inf      84.9      97.9
 
 
 ### corn stand
@@ -5235,6 +5516,70 @@ Fine
 None
 
 
+```{r model corn stand orientation}
+# first test if treatments are different from control
+model.cstando1<- glmer(Corn_stand ~ Orientation * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.cstando1) # AIC: 582.2
+
+model.cstando2<- glmer(Corn_stand ~ Orientation + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.cstando2) # AIC: 580.3
+
+model.cstando3<- glmer(Corn_stand ~  Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.cstando3) # AIC: 884.8
+
+model.cstando4<- glmer(Corn_stand ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.cstando4) # AIC: 885.0
+
+model.cstando5<- glmer(Corn_stand ~ Orientation + Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.cstando5) # AIC: 581.2
+
+model.cstando.best<- glmer(Corn_stand ~ Orientation + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+Anova(model.cstando.best, type="III")
+```
+
+```{r corn stand orientation test assumptions}
+# check residuals
+resid.model.cstando<- resid(model.cstando.best)
+pred.model.cstando<- predict(model.cstando.best)
+
+# check randomness
+plot(pred.model.cstando, resid.model.cstando, ylab="Residuals", xlab="Corn stand", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.cstando, main="Histogram of Residuals", xlab="Corn stand") # almost all same frequency
+
+qqnorm(resid.model.cstando) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.cstando)
+```
+
+```{r corn stand orientation means}
+cstandoemmeans<- emmeans(model.cstando.best, pairwise ~ Orientation, type="response")
+cstandoemmeans
+```
+
+*Best Model:*
+Corn_stand ~ Orientation + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+               Chisq Df Pr(>Chisq)    
+(Intercept) 530.8622  1     <2e-16 ***
+Orientation   0.6201  1      0.431 
+
+*Assumptions:*
+Radomness bad, rest good
+
+*Means:*
+ Orientation rate   SE  df asymp.LCL asymp.UCL
+ O           28.8 4.21 Inf      21.7      38.4
+ P           28.0 4.09 Inf      21.1      37.3
+ 
+*Contrasts:*
+ contrast ratio     SE  df z.ratio p.value
+ O / P     1.03 0.0377 Inf 0.787   0.4310 
+
+
 ### corn height
 
 ```{r plot corn height}
@@ -5446,31 +5791,38 @@ Fine
 None
 
 
-```{r model corn ht orientation}
-model.hto<- lmer(Corn_ht_av ~ Orientation * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt)
-summary(model.hto)
-anova(model.hto)
+```{r model corn height orientation}
+# test if treatments are different from each other
+model.httrto<- lmer(Corn_ht_av ~ Orientation * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt)
+summary(model.httrto)
+anova(model.httrto)
 
 ## model reduction
-model.hto.best<- get_model(lmerTest::step(model.hto, reduce.random=F))
-summary(model.hto.best)
-anova(model.hto.best)
+model.httrto.best<- get_model(lmerTest::step(model.httrto, reduce.random=F))
+summary(model.httrto.best)
+anova(model.httrto.best)
+```
 
+```{r corn height trt level model assumptions, results='hide', message=FALSE, warning=FALSE}
 # check residuals
-resid.model.hto<- resid(model.hto.best)
-pred.model.hto<- predict(model.hto.best)
+resid.model.httrto<- resid(model.httrto.best)
+pred.model.httrto<- predict(model.httrto.best)
 
 # check randomness
-plot(pred.model.hto, resid.model.hto, ylab="Residuals", xlab="Corn height", main="Predictecd vs Residuals")
+plot(pred.model.httrto, resid.model.httrto, ylab="Residuals", xlab="Corn height", main="Predictecd vs Residuals")
 
 # check normality
-hist(resid.model.hto, main="Histogram of Residuals", xlab="Corn height")
+hist(resid.model.httrto, main="Histogram of Residuals", xlab="Corn height")
 
-qqnorm(resid.model.hto) 
+qqnorm(resid.model.httrto) 
 
 # Shapiro-Wilk test
-shapiro.test(resid.model.hto)
+shapiro.test(resid.model.httrto)
 # test assumptions good
+```
+
+```{r corn height difference of means}
+# no effects
 ```
 *Best Model:*
 Corn_ht_av ~ (1 | Year/Rep) + (1 | Location/Rep)
@@ -5479,11 +5831,10 @@ Corn_ht_av ~ (1 | Year/Rep) + (1 | Location/Rep)
 
 
 *Assumptions:*
-Fine
+somewhat not random but fine
 
 *Means:*
 None
-
 
 
 ### corn injury
@@ -5509,22 +5860,22 @@ dirinjtrt$time<- factor(dirinjtrt$time, levels = c("Injury_14DAT","Injury_21DAT"
 ```
 
 ```{r model corn injury trt vs ctrl, results='hide', message=FALSE, warning=FALSE}
-model.inj1<- glmer(injury ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
-summary(model.inj1) # AIC: 6883.6
+model.inj1<- glmer(injury ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinj, family=poisson(link="log"))
+summary(model.inj1) # AIC: 6460.6
 
-model.inj2<- glmer(injury ~ Trt_num + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
-summary(model.inj2) # AIC: 6930.4
+model.inj2<- glmer(injury ~ Trt_num + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinj, family=poisson(link="log"))
+summary(model.inj2) # AIC: 6507.4
 
-model.inj3<- glmer(injury ~  Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
-summary(model.inj3) # AIC: 6988.6
+model.inj3<- glmer(injury ~  Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinj, family=poisson(link="log"))
+summary(model.inj3) # AIC: 6494.8
 
-model.inj4<- glmer(injury ~ 1 + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
-summary(model.inj4) # AIC: 6994.8
+model.inj4<- glmer(injury ~ 1 + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinj, family=poisson(link="log"))
+summary(model.inj4) # AIC: 6501.0
 
-model.inj5<- glmer(injury ~ Trt_num + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
-summary(model.inj5) # AIC: 6924.2
+model.inj5<- glmer(injury ~ Trt_num + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinj, family=poisson(link="log"))
+summary(model.inj5) # AIC: 6501.2
 
-model.inj.best<- glmer(injury ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinj, family=poisson(link="log"))
+model.inj.best<- glmer(injury ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinj, family=poisson(link="log"))
 Anova(model.inj1, type="III")
 ```
 
@@ -5550,60 +5901,60 @@ injemmeans<- emmeans(model.inj.best, pairwise ~ Trt_num*Weediness, type="reponse
 injemmeans
 ```
 *Best Model:*
-injury ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot)
+injury ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot)
 
 *Effects:*
-                   Chisq Df Pr(>Chisq)    
-(Intercept)       45.541  1  1.495e-11 ***
-Trt_num           97.091  5  < 2.2e-16 ***
-Weediness         15.812  1  6.997e-05 ***
-Trt_num:Weediness 50.460  5  1.116e-09 ***
+                    Chisq Df Pr(>Chisq)    
+(Intercept)       40.8507  1  1.643e-10 ***
+Trt_num            8.9406  5     0.1115    
+Weediness         15.8329  1  6.919e-05 ***
+Trt_num:Weediness 50.5289  5  1.080e-09 ***
 
 *Assumptions:*
 okay
 
 *Means:*
- Trt_num Weediness emmean   SE  df asymp.LCL asymp.UCL
- 1       W           3.51 0.52 Inf      2.49      4.53
- 2       W           3.68 0.52 Inf      2.66      4.70
- 3       W           3.27 0.52 Inf      2.25      4.29
- 4       W           3.65 0.52 Inf      2.63      4.67
- 5       W           3.42 0.52 Inf      2.40      4.44
- 6       W           3.33 0.52 Inf      2.31      4.35
- 1       WF          3.35 0.52 Inf      2.33      4.37
- 2       WF          3.48 0.52 Inf      2.47      4.50
- 3       WF          3.43 0.52 Inf      2.41      4.45
- 4       WF          3.59 0.52 Inf      2.57      4.61
- 5       WF          3.44 0.52 Inf      2.42      4.46
- 6       WF          3.33 0.52 Inf      2.31      4.34
+ Trt_num Weediness emmean    SE  df asymp.LCL asymp.UCL
+ 1       W           3.53 0.553 Inf      2.45      4.62
+ 2       W           3.69 0.553 Inf      2.60      4.77
+ 3       W           3.28 0.553 Inf      2.20      4.37
+ 4       W           3.47 0.553 Inf      2.39      4.55
+ 5       W           3.48 0.553 Inf      2.40      4.56
+ 6       W           3.34 0.553 Inf      2.26      4.43
+ 1       WF          3.38 0.553 Inf      2.29      4.46
+ 2       WF          3.49 0.553 Inf      2.40      4.57
+ 3       WF          3.45 0.553 Inf      2.36      4.53
+ 4       WF          3.41 0.553 Inf      2.33      4.50
+ 5       WF          3.50 0.553 Inf      2.42      4.58
+ 6       WF          3.34 0.553 Inf      2.25      4.42
 
 
 ```{r model corn injury trt level, results='hide', message=FALSE, warning=FALSE}
-model.injtrt1<- glmer(injury ~ Trt_crmp * Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
-summary(model.injtrt1) # AIC: 2327.6
+model.injtrt1<- glmer(injury ~ Trt_crmp * Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt1) # AIC: 2297.2
 
-model.injtrt2<- glmer(injury ~ Trt_crmp * Trt_plnt + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
-summary(model.injtrt2) # AIC: 2336.1
+model.injtrt2<- glmer(injury ~ Trt_crmp * Trt_plnt + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt2) # AIC: 2305.7
 
-model.injtrt3<- glmer(injury ~ Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
-summary(model.injtrt3) # AIC: 6970.9
+model.injtrt3<- glmer(injury ~ Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt3) # AIC: 2298.3
 
-model.injtrt4<- glmer(injury ~ Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
-summary(model.injtrt4) # AIC: 2360.1
+model.injtrt4<- glmer(injury ~ Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt4) # AIC: 2306.0
 
-model.injtrt5<- glmer(injury ~ Trt_crmp + Trt_plnt + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
-summary(model.injtrt5) # AIC: 2360.9
+model.injtrt5<- glmer(injury ~ Trt_crmp + Trt_plnt + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt5) # AIC: 2306.5
 
-model.injtrt6<- glmer(injury ~ Trt_crmp * Trt_plnt + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
-summary(model.injtrt6) # AIC: 2336.5
+model.injtrt6<- glmer(injury ~ Trt_crmp * Trt_plnt + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt6) # AIC: 2306.0
 
-model.injtrt7<- glmer(injury ~ Trt_crmp + Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
-summary(model.injtrt7) # AIC: 2362.1
+model.injtrt7<- glmer(injury ~ Trt_crmp + Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt7) # AIC: 2307.7
 
-model.injtrt8<- glmer(injury ~ Trt_crmp * Weediness + Trt_plnt + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
-summary(model.injtrt8) # AIC: 2354.6
+model.injtrt8<- glmer(injury ~ Trt_crmp * Weediness + Trt_plnt + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrt8) # AIC: 2300.2
 
-model.injtrt.best<- glmer(injury ~ Trt_crmp * Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot), data=dirinjtrt, family=poisson(link="log"))
+model.injtrt.best<- glmer(injury ~ Trt_crmp * Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
 Anova(model.inj.best, type="III")
 ```
 
@@ -5629,28 +5980,99 @@ injtrtemmeans<- emmeans(model.injtrt.best, pairwise ~ Trt_crmp*Trt_plnt*Weedines
 injtrtemmeans
 ```
 *Best Model:*
-injury ~ Trt_crmp + Trt_plnt + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Plot) + Trt_crmp : Trt_plnt : Weediness + Trt_crmp : Trt_plnt + Trt_crmp : Weediness + Trt_plnt : Weediness
+injury ~ Trt_crmp + Trt_plnt + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot) + Trt_crmp : Trt_plnt : Weediness + Trt_crmp : Trt_plnt + Trt_crmp : Weediness + Trt_plnt : Weediness
 
 *Effects:*
-                   Chisq Df Pr(>Chisq)    
-(Intercept)       45.541  1  1.495e-11 ***
-Trt_num           97.091  5  < 2.2e-16 ***
-Weediness         15.812  1  6.997e-05 ***
-Trt_num:Weediness 50.460  5  1.116e-09 ***
+                    Chisq Df Pr(>Chisq)    
+(Intercept)       40.8507  1  1.643e-10 ***
+Trt_num            8.9406  5     0.1115    
+Weediness         15.8329  1  6.919e-05 ***
+Trt_num:Weediness 50.5289  5  1.080e-09 ***
 
 *Assumptions:*
 Fine
 
 *Means:*
  Trt_crmp Trt_plnt Weediness rate   SE  df asymp.LCL asymp.UCL
- E        E        W         29.8 18.2 Inf      9.04      98.5
- N        E        W         36.2 22.1 Inf     10.96     119.5
- E        N        W         38.0 23.1 Inf     11.51     125.4
- N        N        W         28.3 17.2 Inf      8.56      93.3
- E        E        WF        29.7 18.1 Inf      8.99      98.0
- N        E        WF        36.9 22.5 Inf     11.19     122.0
- E        N        WF        35.9 21.9 Inf     10.88     118.5
- N        N        WF        33.3 20.3 Inf     10.09     109.9
+ E        E        W         30.7 19.3 Inf      8.95     105.0
+ N        E        W         35.0 22.0 Inf     10.23     120.0
+ E        N        W         34.9 21.9 Inf     10.19     119.5
+ N        N        W         28.8 18.1 Inf      8.39      98.5
+ E        E        WF        30.5 19.2 Inf      8.90     104.4
+ N        E        WF        35.8 22.5 Inf     10.44     122.5
+ E        N        WF        33.0 20.7 Inf      9.63     113.0
+ N        N        WF        33.9 21.3 Inf      9.89     116.0
+
+
+```{r model corn injury orientation}
+model.injtrto1<- glmer(injury ~ Orientation * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrto1) # AIC: 2299.0
+
+model.injtrto2<- glmer(injury ~ Orientation + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrto2) # AIC: 2301.9
+
+model.injtrto3<- glmer(injury ~ Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrto3) # AIC: 2302.8
+
+model.injtrto4<- glmer(injury ~ Orientation + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrto4) # AIC: 2302.3
+
+model.injtrto5<- glmer(injury ~ 1 + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+summary(model.injtrto5) # AIC: 2302.4
+
+model.injtrto.best<- glmer(injury ~ Orientation * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=dirinjtrt, family=poisson(link="log"))
+Anova(model.injtrto.best, type="III")
+```
+
+```{r model corn injury trt level assumptions}
+# check residuals
+resid.model.injtrto<- resid(model.injtrto.best)
+pred.model.injtrto<- predict(model.injtrto.best)
+
+# check randomness
+plot(pred.model.injtrto, resid.model.injtrto, ylab="Residuals", xlab="Corn injury", main="Predictecd vs Residuals") 
+
+# check normality
+hist(resid.model.injtrto, main="Histogram of Residuals", xlab="Corn ht")
+
+qqnorm(resid.model.injtrto) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.injtrto)
+```
+
+```{r corn injury difference of means, results='hide', message=FALSE, warning=FALSE}
+injtrtoemmeans<- emmeans(model.injtrto.best, pairwise ~ Orientation*Weediness, type="response")
+injtrtoemmeans
+```
+*Best Model:*
+injury ~ Orientation * Weediness + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot)
+
+*Effects:*
+                        Chisq Df Pr(>Chisq)    
+(Intercept)           32.2707  1  1.341e-08 ***
+Orientation            4.8130  1    0.02825 *  
+Weediness              0.4120  1    0.52093    
+Orientation:Weediness  5.3033  1    0.02129 * 
+
+*Assumptions:*
+Fine
+
+*Means:*
+ Orientation Weediness rate   SE  df asymp.LCL asymp.UCL
+ O           W         35.0 21.9 Inf     10.26       119
+ P           W         29.7 18.6 Inf      8.72       101
+ O           WF        34.3 21.5 Inf     10.07       117
+ P           WF        32.1 20.1 Inf      9.43       110
+ 
+*Contrasts:*
+ contrast    ratio     SE  df z.ratio p.value
+ O W / P W   1.176 0.0869 Inf  2.194  0.1249 
+ O W / O WF  1.018 0.0290 Inf  0.642  0.9184 
+ O W / P WF  1.089 0.0802 Inf  1.151  0.6578 
+ P W / O WF  0.866 0.0641 Inf -1.945  0.2092 
+ P W / P WF  0.926 0.0280 Inf -2.559  0.0514 
+ O WF / P WF 1.069 0.0788 Inf  0.902  0.8035
 
 
 ### corn tasseling
@@ -5837,6 +6259,80 @@ couple blips in hist but otherwise good
  W / WF   0.409 0.0242 Inf -15.122 <.0001 *
 
 
+```{r model corn marketable count orientation}
+# first test if treatments are different from control
+model.mcounttrto1<- glmer(M_count ~ Orientation * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrto1) # AIC: 733.8
+
+model.mcounttrto2<- glmer(M_count ~ Orientation + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrto2) # AIC: 981.8
+
+model.mcounttrto3<- glmer(M_count ~ Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrto3) # AIC: 735.1
+
+model.mcounttrto4<- glmer(M_count ~ Orientation + Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrto4) # AIC: 732
+
+model.mcounttrto5<- glmer(M_count ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.mcounttrto5) # AIC: 984.9
+
+model.mcounttrto.best<- glmer(M_count ~ Orientation + Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+Anova(model.mcounttrto.best, type="III")
+```
+
+```{r model corn marketable count trt vs ctrl assumptions}
+# check residuals
+resid.model.Mtrto<- resid(model.mcounttrto.best)
+pred.model.Mtrto<- predict(model.mcounttrto.best)
+
+# check randomness
+plot(pred.model.Mtrto, resid.model.Mtrto, ylab="Residuals", xlab="Corn M count", main="Predictecd vs Residuals") 
+
+# check normality
+hist(resid.model.Mtrto, main="Histogram of Residuals", xlab="Corn M count")
+
+qqnorm(resid.model.Mtrto) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.Mtrto)
+```
+
+```{r marketable count trt vs ctrl means}
+mtrtoemmeans1<- emmeans(model.mcounttrto.best, pairwise ~ Weediness, type="response")
+mtrtoemmeans1
+
+mtrtoemmeans2<- emmeans(model.mcounttrto.best, pairwise ~ Orientation, type="response")
+mtrtoemmeans2
+```
+*Best Model:*
+M_count ~  Orientation + Weediness + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+               Chisq Df Pr(>Chisq)    
+(Intercept) 100.3993  1    < 2e-16 ***
+Orientation   5.0832  1    0.02416 *  
+Weediness   228.6776  1    < 2e-16 ***
+
+*Assumptions:*
+couple blips in hist but otherwise good
+
+*Means:*
+ Weediness  rate   SE  df asymp.LCL asymp.UCL
+ W          7.93 1.57 Inf      5.37      11.7
+ WF        19.38 3.78 Inf     13.23      28.4
+ 
+ Orientation rate   SE  df asymp.LCL asymp.UCL
+ O           11.7 2.29 Inf      7.94      17.2
+ P           13.2 2.58 Inf      8.97      19.3
+ 
+*Comparisons:*
+ contrast ratio     SE  df z.ratio p.value
+ W / WF   0.409 0.0242 Inf -15.122 <.0001 *
+ 
+ contrast ratio     SE  df z.ratio p.value
+ O / P    0.886 0.0476 Inf -2.255  0.0242 *
+ 
+
 ### corn marketable weight
 
 ```{r plot corn marketable weight}
@@ -6009,6 +6505,71 @@ Fine
  N E - N N   -0.294 0.32 82.3 -0.919  0.7948 
  E N - N N   -0.413 0.32 82.3 -1.290  0.5719
 
+
+```{r model corn marketable weight orientation}
+# test if treatments are different from each other
+model.mwttrto<- lmer(M_wt ~ Orientation * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt)
+summary(model.mwttrto)
+anova(model.mwttrto)
+
+## model reduction
+model.mwttrto.best<- get_model(lmerTest::step(model.mwttrto, reduce.random=F))
+summary(model.mwttrto.best)
+anova(model.mwttrto.best)
+```
+
+```{r corn marketable weight model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.mwttrto<- resid(model.mwttrto.best)
+pred.model.mwttrto<- predict(model.mwttrto.best)
+
+# check randomness
+plot(pred.model.mwttrto, resid.model.mwttrto, ylab="Residuals", xlab="Corn marketable weight", main="Predictecd vs Residuals") # divided in 2
+
+# check normality
+hist(resid.model.mwttrto, main="Histogram of Residuals", xlab="Corn marketable weight") 
+
+qqnorm(resid.model.mwttrto) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.mwttrto)
+# test assumptions met
+```
+
+```{r corn marketable weight difference of means}
+mwttrtomean1<- emmeans(model.mwttrto.best, pairwise ~ Weediness)
+mwttrtomean1
+
+mwttrtomean2<- emmeans(model.mwttrto.best, pairwise ~ Orientation)
+mwttrtomean2
+```
+*Best Model:*
+M_wt ~ Orientation + Weediness + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+             Sum Sq Mean Sq NumDF DenDF  F value  Pr(>F)    
+Orientation   6.065   6.065     1    92   4.9878 0.02795 *  
+Weediness   228.305 228.305     1    92 187.7645 < 2e-16 ***
+
+*Assumptions:*
+Fine -- pattern to randomness, hist not entirely bell shaped
+
+*Means:*
+ Weediness emmean    SE   df lower.CL upper.CL
+ W           1.52 0.695 1.05    -6.30     9.35
+ WF          4.61 0.695 1.05    -3.22    12.43
+ 
+ Orientation emmean    SE   df lower.CL upper.CL
+ O             2.81 0.695 1.05    -5.01     10.6
+ P             3.32 0.695 1.05    -4.51     11.1
+
+*Comparisons:*
+ contrast estimate    SE   df t.ratio p.value
+ W - WF      -3.08 0.225 84.3 -13.703 <.0001*
+
+ contrast estimate    SE   df t.ratio p.value
+ O - P      -0.503 0.225 84.3 -2.233  0.0282 *
+ 
 
 ### corn unmarketable count
 
@@ -6198,6 +6759,61 @@ Good
  E / N    0.876 0.043 Inf -2.698  0.0070 *
 
 
+```{r model corn unmarketable count orientation}
+# test if treatments are different from each other
+model.umcounttrto1<- glmer(UM_count ~ Orientation * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrto1) # AIC: 671.3
+
+model.umcounttrto2<- glmer(UM_count ~ Orientation + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrto2) # AIC: 668.3
+
+model.umcounttrto3<- glmer(UM_count ~ Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrto3) # AIC: 668.2
+
+model.umcounttrto4<- glmer(UM_count ~ Orientation + Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrto4) # AIC: 670.1
+
+model.umcounttrto5<- glmer(UM_count ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrto5) # AIC: 666.4 -> best
+
+model.umcounttrto.best<- glmer(UM_count ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+Anova(model.umcounto.best, type="III")
+```
+
+```{r corn unmarketable count model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.umcounttrto<- resid(model.umcounttrto.best)
+pred.model.umcounttrto<- predict(model.umcounttrto.best)
+
+# check randomness
+plot(pred.model.umcounttrto, resid.model.umcounttrto, ylab="Residuals", xlab="Corn unmarketable count", main="Predictecd vs Residuals") 
+
+# check normality
+hist(resid.model.umcounttrto, main="Histogram of Residuals", xlab="Corn unmarketable count") 
+
+qqnorm(resid.model.umcounttrto) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.umcounttrto)
+# test assumptions met
+```
+
+```{r corn unmarketable count difference of means}
+# no main effects
+```
+*Best Model:*
+UM_count ~ 1 + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+None
+
+*Assumptions:*
+Good
+
+*Means:*
+None
+
+
 ### corn unmarketable weight
 
 ```{r plot corn unmarketable weight}
@@ -6352,19 +6968,70 @@ Fine
  E - N      -0.313 0.146 84.9 -2.147  0.0346 *
 
 
+```{r model corn unmarketable weight orientation}
+# test if treatments are different from each other
+model.umwttrto<- lmer(UM_wt ~ Orientation * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt)
+summary(model.umwttrto)
+anova(model.umwttrto)
+
+## model reduction
+model.umwttrto.best<- get_model(lmerTest::step(model.umwttrto, reduce.random=F))
+summary(model.umwttrto.best)
+anova(model.umwttrto.best)
+```
+
+```{r corn unmarketable weight model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.umwttrto<- resid(model.umwttrto.best)
+pred.model.umwttrto<- predict(model.umwttrto.best)
+
+# check randomness
+plot(pred.model.umwttrto, resid.model.umwttrto, ylab="Residuals", xlab="Corn unmarketable weight", main="Predictecd vs Residuals") # divided in 3
+
+# check normality
+hist(resid.model.umwttrto, main="Histogram of Residuals", xlab="Corn unmarketable weight") # not normal 
+
+qqnorm(resid.model.umwttrto) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.umwttrto)
+# test assumptions mostly met
+```
+
+```{r corn unmarketable weight difference of means}
+# no main effects
+```
+*Best Model:*
+UM_wt ~  (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+
+
+*Assumptions:*
+Randomness very divided in 3 sections, otherwise fine
+
+*Means:*
+
+
 ### total weed count
 
 ```{r weed count data modifications, results='hide', message=FALSE, warning=FALSE}
 # table with sums of weed counts & standard deviation for within each combination of rye planting direction, rye crimping/corn planting direction, and time 
 wtab<-dirw %>%
-  group_by(Plot, Rep, Trt_num, Trt_plnt, Trt_crmp, Time) %>%
+  group_by(Year, Location, Plot, Rep, Trt_num, Trt_plnt, Trt_crmp, Orientation, Time) %>%
   summarize(CountSum=sum(Count), SD=sd(Count))
+
+wtab$Year<- as.factor(wtab$Year)
+wtab$Location<- as.factor(wtab$Location)
+wtab$Plot<- as.factor(wtab$Plot)
+wtab$Trt_crmp<- as.factor(wtab$Trt_crmp)
+wtab$Trt_plnt<- as.factor(wtab$Trt_plnt)
 
 wtab$Time<- factor(wtab$Time, levels = c("PRE","28DAT","56DAT")) # reorder Time levels so chronological
 
-wtab<- wtab[-73,] # weird row at end containing NAs -> need to find source
-
 wtabtrt<- subset(wtab, Trt_plnt=="E"|Trt_plnt=="N")
+
+str(wtab)
 ```
 
 ```{r plot weed counts}
@@ -6400,52 +7067,22 @@ print(weed)
 # no apparent treatment effects at any time, but all lower & less variation than ctrls
 ```
 
-```{r plot weed count rep effect, results='hide', message=FALSE, warning=FALSE}
-weedrep<- ggplot(wtab, aes(x = Rep, y = CountSum)) +
-          geom_boxplot() +
-          theme_bw()
-print(weedrep)
-# no apparent rep effects
-
-# anova of reps to determine if statistically different
-# weedrep<- anova_test(CountSum ~ Rep, data=wtab) 
-# not working for some reason
-# weedrep
-# 
-```
-
 ```{r model weed count trt vs control}
 # first test if treatments are different from control
-model.wcount1<- glmer(CountSum ~ Trt_num * Time + ( 1 | Rep) + (1 | Plot), data=wtab, family=poisson)
-summary(model.wcount1)
-Anova(model.wcount1, type="III")
+## glmer failed to converge so using lmer
+model.wcount<- lmer(CountSum ~ Trt_num * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=wtab)
+summary(model.wcount) 
+anova(model.wcount)
 
-wcountmean1<- emmeans(model.wcount1, pairwise ~ Trt_num * Time)
-wcountmean1
-# diffs btwn ctrls & trts PRE
-# no diffs btwn ctrls & trts 28DAT & 56DAT
-
-plot(wcountmean1)
+model.wcount.best<- get_model(lmerTest::step(model.wcount, reduce.random=F))
+summary(model.wcount.best) 
+anova(model.wcount.best)
 ```
 
-```{r model weed count trt level, results='hide', message=FALSE, warning=FALSE}
-# test if treatments are different from each other
-model.wcount2<- glmer(CountSum ~ Trt_plnt * Trt_crmp * Time + ( 1 | Rep) + (1 | Plot), data=wtabtrt, family=poisson)
-summary(model.wcount2) # AIC = 432.8
-Anova(model.wcount2, type="III")
-
-# model reduction
-step<- stepcAIC(model.wcount2, data=wtabtrt, trace=T, direction="backward", returnResult=T)
-
-# best model: CountSum ~ Trt_plnt + Trt_crmp + Time + (1 | Plot) + (1 | Rep)
-
-model.wcount2.best<- glmer(CountSum ~ Trt_plnt + Trt_crmp + Time + (1 | Plot) + (1 | Rep), data=wtabtrt, family=poisson)
-```
-
-```{r weed count model assumptions, results='hide', message=FALSE, warning=FALSE}
+```{r model weed count trt vs ctrl assumptions}
 # check residuals
-resid.model.wcount<- resid(model.wcount2.best)
-pred.model.wcount<- predict(model.wcount2.best)
+resid.model.wcount<- resid(model.wcount.best)
+pred.model.wcount<- predict(model.wcount.best)
 
 # check randomness
 plot(pred.model.wcount, resid.model.wcount, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
@@ -6460,18 +7097,151 @@ shapiro.test(resid.model.wcount)
 # test assumptions mostly met
 ```
 
-```{r weed count difference of means}
-wcountmean2<- emmeans(model.wcount2.best, pairwise ~ Trt_plnt)
-wcountmean2
+```{r model weed count trt vs ctrl log}
+# first test if treatments are different from control
+## glmer failed to converge so using lmer
+model.wcountlog<- lmer(log(CountSum) ~ Trt_num * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=wtab)
+summary(model.wcountlog) 
+anova(model.wcountlog)
 
-wcountmean3<- emmeans(model.wcount2.best, pairwise ~ Trt_crmp)
-wcountmean3
-
-wcountmean4<- emmeans(model.wcount2.best, pairwise ~ Time)
-wcountmean4
-plot(wcountmean4)
-# weed counts low 28DAT
+model.wcountlog.best<- get_model(lmerTest::step(model.wcountlog, reduce.random=F))
+summary(model.wcountlog.best) 
+anova(model.wcountlog.best)
 ```
+
+```{r model weed count trt vs ctrl assumptions}
+# check residuals
+resid.model.wcountlog<- resid(model.wcountlog.best)
+pred.model.wcountlog<- predict(model.wcountlog.best)
+
+# check randomness
+plot(pred.model.wcountlog, resid.model.wcountlog, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.wcountlog, main="Histogram of Residuals", xlab="Weed counts") # not quite normal but no patterned skewness
+
+qqnorm(resid.model.wcountlog) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.wcountlog)
+# test assumptions mostly met
+```
+
+```{r weed count trt vs ctrl means}
+wmean<- emmeans(model.wcountlog.best, pairwise ~ Time, type="response")
+wmean
+```
+*Best Model:*
+log(CountSum) ~ Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot)
+
+*Effects:*
+     Sum Sq Mean Sq NumDF  DenDF F value  Pr(>F)  
+Time 2.4908  1.2454     2 86.007  4.2406 0.01752 *
+
+*Assumptions:*
+slightly long right tail
+
+*Means:*
+ Time  response   SE   df lower.CL upper.CL
+ PRE       58.6 55.7 1.59    0.302    11357
+ 28DAT     43.4 41.4 1.61    0.237     7951
+ 56DAT     58.6 55.8 1.60    0.306    11234
+ 
+*Comparisons:*
+ contrast      ratio     SE   df t.ratio p.value
+ PRE / 28DAT   1.349 0.1455 92.9  2.778  0.0180 *
+ PRE / 56DAT   0.999 0.1086 93.8 -0.007  1.0000 
+ 28DAT / 56DAT 0.741 0.0957 93.2 -2.324  0.0573
+
+
+```{r model weed count trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.wcounttrt<- lmer(CountSum ~ Trt_plnt * Trt_crmp * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=wtabtrt)
+summary(model.wcounttrt)
+anova(model.wcounttrt)
+
+model.wcounttrt.best<- get_model(lmerTest::step(model.wcounttrt, reduce.random=F))
+summary(model.wcounttrt.best)
+anova(model.wcounttrt.best)
+```
+
+```{r weed count model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.wcounttrt<- resid(model.wcounttrt.best)
+pred.model.wcounttrt<- predict(model.wcounttrt.best)
+
+# check randomness
+plot(pred.model.wcounttrt, resid.model.wcounttrt, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.wcounttrt, main="Histogram of Residuals", xlab="Weed counts") # not quite normal but no patterned skewness
+
+qqnorm(resid.model.wcounttrt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.wcounttrt)
+# test assumptions mostly met
+```
+
+```{r weed count difference of means}
+# no means
+```
+*Best Model:*
+CountSum ~  + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot)
+
+*Effects:*
+None
+
+*Assumptions:*
+Fine
+
+*Means:*
+None
+
+
+```{r model weed count orientation}
+# test if treatments are different from each other
+model.wcounttrto<- lmer(CountSum ~ Orientation * Time + (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot), data=wtabtrt)
+summary(model.wcounttrto)
+anova(model.wcounttrto)
+
+model.wcounttrto.best<- get_model(lmerTest::step(model.wcounttrto, reduce.random=F))
+summary(model.wcounttrto.best)
+anova(model.wcounttrto.best)
+```
+
+```{r weed count model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.wcounttrto<- resid(model.wcounttrto.best)
+pred.model.wcounttrto<- predict(model.wcounttrto.best)
+
+# check randomness
+plot(pred.model.wcounttrto, resid.model.wcounttrto, ylab="Residuals", xlab="Weed counts", main="Predictecd vs Residuals")
+
+# check normality
+hist(resid.model.wcounttrto, main="Histogram of Residuals", xlab="Weed counts") # not quite normal but no patterned skewness
+
+qqnorm(resid.model.wcounttrto) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.wcounttrto)
+# test assumptions mostly met
+```
+
+```{r weed count difference of means}
+# no means
+```
+*Best Model:*
+CountSum ~ (1 | Year/Rep) + (1 | Location/Rep) + (1 | Year:Location:Plot)
+
+*Effects:*
+None
+
+*Assumptions:*
+Fine
+
+*Means:*
+None
 
 
 ### total weed biomass
@@ -6479,8 +7249,14 @@ plot(wcountmean4)
 ```{r weed weight data modifications, results='hide', message=FALSE, warning=FALSE}
 # table with sums of weed counts & standard deviation for within each combination of rye planting direction, rye crimping/corn planting direction, and time 
 wtab2<-subset(dirw, Time=="56DAT") %>%
-  group_by(Location, Year, Plot, Rep, Trt_num, Trt_plnt, Trt_crmp) %>%
+  group_by(Location, Year, Plot, Rep, Trt_num, Trt_plnt, Trt_crmp, Orientation) %>%
   summarize(WeightSum=sum(Weight), WSD=sd(Weight))
+
+wtab2$Year<- as.factor(wtab2$Year)
+wtab2$Location<- as.factor(wtab2$Location)
+wtab2$Plot<- as.factor(wtab2$Plot)
+wtab2$Trt_crmp<- as.factor(wtab2$Trt_crmp)
+wtab2$Trt_plnt<- as.factor(wtab2$Trt_plnt)
 
 wtab2trt<- subset(wtab2, Trt_plnt=="E"|Trt_plnt=="N")
 ```
@@ -6533,7 +7309,8 @@ shapiro.test(resid.model.wwt)
 ```
 
 ```{r weed wt trt vs ctrl means}
-wwtmean<- emmeans()
+wwtmean<- emmeans(model.wwt.best, pairwise ~ Trt_num)
+wwtmean
 ```
 
 *Best Model:*
@@ -6547,50 +7324,123 @@ Trt_num 390826   78165     5    42  10.599 1.25e-06 ***
 Randomness not great
 
 *Means:*
-
+ Trt_num emmean   SE df lower.CL upper.CL
+ 1          291 30.4 21    228.1      354
+ 2          315 30.4 21    251.9      378
+ 3          139 30.4 21     75.9      202
+ 4          104 30.4 21     41.2      168
+ 5          110 30.4 21     47.0      173
+ 6          102 30.4 21     39.2      166
 
 *Comparisons:*
-
+ contrast estimate   SE df t.ratio p.value
+ 1 - 2      -23.80 42.9 35 -0.554  0.9933 
+ 1 - 3      152.16 42.9 35  3.544  0.0134 *
+ 1 - 4      186.85 42.9 35  4.352  0.0014 *
+ 1 - 5      181.09 42.9 35  4.217  0.0021 *
+ 1 - 6      188.85 42.9 35  4.398  0.0013 *
+ 2 - 3      175.97 42.9 35  4.098  0.0030 *
+ 2 - 4      210.66 42.9 35  4.906  0.0003 *
+ 2 - 5      204.89 42.9 35  4.772  0.0004 *
+ 2 - 6      212.66 42.9 35  4.953  0.0003 *
+ 3 - 4       34.69 42.9 35  0.808  0.9642 
+ 3 - 5       28.92 42.9 35  0.674  0.9837 
+ 3 - 6       36.69 42.9 35  0.854  0.9547 
+ 4 - 5       -5.77 42.9 35 -0.134  1.0000 
+ 4 - 6        2.00 42.9 35  0.047  1.0000 
+ 5 - 6        7.77 42.9 35  0.181  1.0000 
 
 
 ```{r model weed weight trt level, results='hide', message=FALSE, warning=FALSE}
 # test if treatments are different from each other
-model.wwt2<- lmer(WeightSum ~ Trt_plnt * Trt_crmp + ( 1 | Rep), data=wtab2trt)
-summary(model.wwt2)
-anova(model.wwt2)
-
-isSingular(model.wwt2)
+model.wwttrt<- lmer(WeightSum ~ Trt_plnt * Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep), data=wtab2trt)
+summary(model.wwttrt)
+anova(model.wwttrt)
 
 ## model reduction
-model.wwt2.best<- get_model(lmerTest::step(model.wwt2, reduce.random=F))
-summary(model.wwt2.best)
-anova(model.wwt2.best)
-### best model: WeightSum ~ (1 | Rep)
+model.wwttrt.best<- get_model(lmerTest::step(model.wwttrt, reduce.random=F))
+summary(model.wwttrt.best)
+anova(model.wwttrt.best)
 ```
 
 ```{r weed weight model assumptions, results='hide', message=FALSE, warning=FALSE}
 # check residuals
-resid.model.wwt<- resid(model.wwt2.best)
-pred.model.wwt<- predict(model.wwt2.best)
+resid.model.wwttrt<- resid(model.wwttrt.best)
+pred.model.wwttrt<- predict(model.wwttrt.best)
 
 # check randomness
-plot(pred.model.wwt, resid.model.wwt, ylab="Residuals", xlab="Weed weights", main="Predictecd vs Residuals") # all in line
+plot(pred.model.wwttrt, resid.model.wwttrt, ylab="Residuals", xlab="Weed weights", main="Predictecd vs Residuals") # all in line
 
 # check normality
-hist(resid.model.wwt, main="Histogram of Residuals", xlab="Weed weights") # almost all same value
+hist(resid.model.wwttrt, main="Histogram of Residuals", xlab="Weed weights") # almost all same value
 
-qqnorm(resid.model.wwt) 
+qqnorm(resid.model.wwttrt) 
 
 # Shapiro-Wilk test
-shapiro.test(resid.model.wwt)
+shapiro.test(resid.model.wwttrt)
 # test assumptions not met but no trends
 ```
 
 ```{r weed weight difference of means}
 # no main effects
 ```
+*Best Model:*
+WeightSum ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+none
+
+*Assumptions:*
+bad randomness, histogram not great but not a lot of data to make better
+
+*Means:*
+None
 
 
+```{r model weed weight trt level orientation}
+# test if treatments are different from each other
+model.wwttrto<- lmer(WeightSum ~ Orientation + (1 | Year/Rep) + (1 | Location/Rep), data=wtab2trt)
+summary(model.wwttrto)
+anova(model.wwttrto)
+
+## model reduction
+model.wwttrto.best<- get_model(lmerTest::step(model.wwttrto, reduce.random=F))
+summary(model.wwttrto.best)
+anova(model.wwttrto.best)
+```
+
+```{r weed weight model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.wwttrto<- resid(model.wwttrto.best)
+pred.model.wwttrto<- predict(model.wwttrto.best)
+
+# check randomness
+plot(pred.model.wwttrto, resid.model.wwttrto, ylab="Residuals", xlab="Weed weights", main="Predictecd vs Residuals") # all in line
+
+# check normality
+hist(resid.model.wwttrto, main="Histogram of Residuals", xlab="Weed weights") # almost all same value
+
+qqnorm(resid.model.wwttrto) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.wwttrto)
+# test assumptions not met but no trends
+```
+
+```{r weed weight difference of means}
+# no main effects
+```
+*Best Model:*
+WeightSum ~ (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+none
+
+*Assumptions:*
+bad randomness, histogram not great but not a lot of data to make better
+
+*Means:*
+None
 ### correlation btwn rye biomass & weed biomass
 
 ```{r}

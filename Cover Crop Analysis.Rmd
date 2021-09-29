@@ -1938,10 +1938,10 @@ Mplot1<- ggplot(datw, aes(x = Trt_code, y = M_count, fill=factor(SR))) +
           theme_bw()
 print(Mplot1)
 ```
-Not converging with glmer so using glmer
+Not converging with glmer so using lmer
 ```{r M corn count analysis -- trt vs ctrl}
 # model analysis for marketable corn count trts vs ctrls
-model.M<- glmer(M_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw)
+model.M<- lmer(M_count ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw)
 summary(model.M)
 anova(model.M)
 
@@ -5839,19 +5839,6 @@ couple blips in hist but otherwise good
 
 ### corn marketable weight
 
-```{r marketable weight data modifications, results='hide', message=FALSE, warning=FALSE}
-# use dir
-# make long form for weedy/weed-free
-dir5 <- dir %>%
-  gather(key = "weediness", value = "weight", W_M_wt,	WF_M_wt) %>%
-  convert_as_factor(Plot, weediness)
-
-dir5$Trt_num<- as.factor(dir5$Trt_num)
-
-# remove control for comparing treatments
-dir5trt<- subset(dir5, Trt_plnt=="E"|Trt_plnt=="N")
-```
-
 ```{r plot corn marketable weight}
 mwt<- ggplot(dir5, aes(x = weediness, y = weight)) + 
           geom_boxplot() +
@@ -5884,60 +5871,22 @@ print(mwt)
 # weed-free higher in all cases, no other trends evident
 ```
 
-```{r plot corn marketable weight rep effect, results='hide', message=FALSE, warning=FALSE}
-mwtrep<- ggplot(dir5, aes(x = Rep, y = weight)) +
-          geom_boxplot() +
-          theme_bw()
-print(mwtrep)
-# no apparent rep effects
-
-# anova of reps to determine if statistically different
-mwtrep<- anova_test(weight ~ Rep, data=dir5)
-mwtrep
-# not significant
-```
-
 ```{r model corn marketable weight trt vs control}
 # first test if treatments are different from control
-model.mwt1<- lmer(weight ~ Trt_num * weediness + ( 1 | Rep), data=dir5)
-summary(model.mwt1)
-anova(model.mwt1)
+model.mwt<- lmer(M_wt ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir)
+summary(model.mwt)
+anova(model.mwt)
 
 ## model reduction
-model.mwt1.best<- get_model(lmerTest::step(model.mwt1, reduce.random=F))
-summary(model.mwt1.best)
-anova(model.mwt1.best)
-### best model: weight ~ Trt_num * weediness + (1 | Rep)
-
-mwtmean1<- emmeans(model.mwt1.best, pairwise ~ Trt_num*weediness)
-mwtmean1
-# weedy control 1 lower than weedy trt5
-# weedy control 2 lower than weedy trt 3, 5, 6
-# weed free ctrl 1 & 2 higher than all other wf trts
-
-plot(mwtmean1)
-# seems to be measurable affect of rye cover crop
-## evident by difference in weed-free yield
-### also East-planted corn did worse in weedy than North
+model.mwt.best<- get_model(lmerTest::step(model.mwt, reduce.random=F))
+summary(model.mwt.best)
+anova(model.mwt.best)
 ```
 
-```{r model corn marketable weight trt level, results='hide', message=FALSE, warning=FALSE}
-# test if treatments are different from each other
-model.mwt2<- lmer(weight ~ Trt_plnt * Trt_crmp * weediness + ( 1 | Rep), data=dir5trt)
-summary(model.mwt2)
-anova(model.mwt2)
-
-## model reduction
-model.mwt2.best<- get_model(lmerTest::step(model.mwt2, reduce.random=F))
-summary(model.mwt2.best)
-anova(model.mwt2.best)
-### best model: weight ~ weediness + (1 | Rep)
-```
-
-```{r corn marketable weight model assumptions, results='hide', message=FALSE, warning=FALSE}
+```{r model corn marketable wt trt vs ctrl assumptions}
 # check residuals
-resid.model.mwt<- resid(model.mwt2.best)
-pred.model.mwt<- predict(model.mwt2.best)
+resid.model.mwt<- resid(model.mwt.best)
+pred.model.mwt<- predict(model.mwt.best)
 
 # check randomness
 plot(pred.model.mwt, resid.model.mwt, ylab="Residuals", xlab="Corn marketable weight", main="Predictecd vs Residuals") # divided in 2
@@ -5952,27 +5901,116 @@ shapiro.test(resid.model.mwt)
 # test assumptions met
 ```
 
-```{r corn marketable weight difference of means}
-mwtmean2<- emmeans(model.mwt2.best, pairwise ~ weediness)
-mwtmean2
-# 2.13 more marketable weight in weed-free than weedy
+```{r corn marketable weight trt vs ctrl means}
+mwtmean<- emmeans(model.mwt.best, pairwise ~ Trt_num*Weediness)
+mwtmean
 ```
+*Best Model:*
+M_wt ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+                  Sum Sq Mean Sq NumDF  DenDF F value    Pr(>F)    
+Trt_num            32.09    6.42     5 129.67   4.078    0.0018 ** 
+Weediness         754.01  754.01     1 129.67 479.176 < 2.2e-16 ***
+Trt_num:Weediness 162.65   32.53     5 129.67  20.673 3.829e-15 ***
+
+*Assumptions:*
+possible upper outlier, otherwise great
+
+*Means:*
+ Trt_num Weediness  emmean   SE   df lower.CL upper.CL
+ 1       W         -0.0196 0.79 1.63  -4.2836     4.24
+ 2       W          0.2785 0.79 1.63  -3.9854     4.54
+ 3       W          1.4773 0.79 1.63  -2.7866     5.74
+ 4       W          1.2291 0.79 1.63  -3.0348     5.49
+ 5       W          1.3925 0.79 1.63  -2.8714     5.66
+ 6       W          1.8576 0.79 1.63  -2.4063     6.12
+ 1       WF         7.9181 0.79 1.63   3.6542    12.18
+ 2       WF         7.4630 0.79 1.63   3.1990    11.73
+ 3       WF         4.7895 0.79 1.63   0.5256     9.05
+ 4       WF         4.2120 0.79 1.63  -0.0519     8.48
+ 5       WF         4.2860 0.79 1.63   0.0221     8.55
+ 6       WF         5.0060 0.79 1.63   0.7421     9.27
+
+*Comparisons:*
+
+
+
+```{r model corn marketable weight trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.mwttrt<- lmer(M_wt ~ Trt_plnt * Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt)
+summary(model.mwttrt)
+anova(model.mwttrt)
+
+## model reduction
+model.mwttrt.best<- get_model(lmerTest::step(model.mwttrt, reduce.random=F))
+summary(model.mwttrt.best)
+anova(model.mwttrt.best)
+```
+
+```{r corn marketable weight model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.mwttrt<- resid(model.mwttrt.best)
+pred.model.mwttrt<- predict(model.mwttrt.best)
+
+# check randomness
+plot(pred.model.mwttrt, resid.model.mwttrt, ylab="Residuals", xlab="Corn marketable weight", main="Predictecd vs Residuals") # divided in 2
+
+# check normality
+hist(resid.model.mwttrt, main="Histogram of Residuals", xlab="Corn marketable weight") 
+
+qqnorm(resid.model.mwttrt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.mwttrt)
+# test assumptions met
+```
+
+```{r corn marketable weight difference of means}
+mwttrtmean1<- emmeans(model.mwttrt.best, pairwise ~ Weediness)
+mwttrtmean1
+
+mwttrtmean2<- emmeans(model.mwttrt.best, pairwise ~ Trt_crmp*Trt_plnt)
+mwttrtmean2
+```
+*Best Model:*
+ M_wt ~ Trt_plnt + Trt_crmp + Weediness + (1 | Year/Rep) + (1 | Location/Rep) + Trt_plnt:Trt_crmp
+
+*Effects:*
+                   Sum Sq Mean Sq NumDF DenDF  F value  Pr(>F)    
+Trt_plnt            1.044   1.044     1    90   0.8493 0.35921    
+Trt_crmp            0.194   0.194     1    90   0.1576 0.69228    
+Weediness         228.305 228.305     1    90 185.7378 < 2e-16 ***
+Trt_plnt:Trt_crmp   6.065   6.065     1    90   4.9339 0.02884 *
+
+*Assumptions:*
+Fine
+
+*Means:*
+ Weediness emmean    SE   df lower.CL upper.CL
+ W           1.52 0.695 1.06    -6.29     9.34
+ WF          4.61 0.695 1.06    -3.21    12.42
+ 
+  Trt_crmp Trt_plnt emmean    SE   df lower.CL upper.CL
+ E        E          3.47 0.714 1.17    -2.96     9.89
+ N        E          2.87 0.714 1.17    -3.55     9.30
+ E        N          2.75 0.714 1.17    -3.67     9.18
+ N        N          3.17 0.714 1.17    -3.26     9.60
+
+*Comparisons:*
+ contrast estimate    SE   df t.ratio p.value
+ W - WF      -3.08 0.226 82.3 -13.629 <.0001 *
+ 
+  contrast  estimate   SE   df t.ratio p.value
+ E E - N E    0.593 0.32 82.3  1.851  0.2572 
+ E E - E N    0.711 0.32 82.3  2.222  0.1258 
+ E E - N N    0.298 0.32 82.3  0.932  0.7876 
+ N E - E N    0.119 0.32 82.3  0.371  0.9825 
+ N E - N N   -0.294 0.32 82.3 -0.919  0.7948 
+ E N - N N   -0.413 0.32 82.3 -1.290  0.5719
 
 
 ### corn unmarketable count
-
-```{r unmarketable count data modifications, results='hide', message=FALSE, warning=FALSE}
-# use dir
-# make long form for weedy/weed-free
-dir6 <- dir %>%
-  gather(key = "weediness", value = "count", W_UM_count,	WF_UM_count) %>%
-  convert_as_factor(Plot, weediness)
-
-dir6$Trt_num<- as.factor(dir6$Trt_num)
-
-# remove control for comparing treatments
-dir6trt<- subset(dir6, Trt_plnt=="E"|Trt_plnt=="N")
-```
 
 ```{r plot corn unmarketable count}
 umcount<- ggplot(dir6, aes(x = weediness, y = count)) + 
@@ -6007,57 +6045,32 @@ print(umcount)
 # might be evidence of later maturity in cover crop
 ```
 
-```{r plot corn unmarketable count rep effect, results='hide', message=FALSE, warning=FALSE}
-umcountrep<- ggplot(dir6, aes(x = Rep, y = count)) +
-          geom_boxplot() +
-          theme_bw()
-print(umcountrep)
-# no apparent rep effects
-
-# anova of reps to determine if statistically different
-umcountrep<- anova_test(count ~ Rep, data=dir6)
-umcountrep
-# not significant
-```
-
 ```{r model corn unmarketable count trt vs control}
 # first test if treatments are different from control
-model.umcount1<- lmer(count ~ Trt_num * weediness + ( 1 | Rep), data=dir6)
-summary(model.umcount1)
-anova(model.umcount1)
+model.umcount1<- glmer(UM_count ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.umcount1) # AIC: 1116.9
 
-## model reduction
-model.umcount1.best<- get_model(lmerTest::step(model.umcount1, reduce.random=F))
-summary(model.umcount1.best)
-anova(model.umcount1.best)
-### best model: count ~ Trt_num * weediness + (1 | Rep)
+model.umcount2<- glmer(UM_count ~ Trt_num + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.umcount2) # AIC: 1122.4
 
-umcountmean1<- emmeans(model.umcount1.best, pairwise ~ Trt_num*weediness)
-umcountmean1
-# weedy & wf ctrls not diff from weedy & wf trts
-# highest weedy means in 3, 4, 6
-# highest wf means in 1, 2, 3
+model.umcount3<- glmer(UM_count ~  Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.umcount3) # AIC: 1133.6
 
-plot(umcountmean1)
+model.umcount4<- glmer(UM_count ~ Trt_num + Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.umcount4) # AIC: 1121.1
+
+model.umcount5<- glmer(UM_count ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+summary(model.umcount5) # AIC: 1134.9
+
+
+model.umcount.best<- glmer(UM_count ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir, family=poisson(link="log"))
+Anova(model.umcount.best, type="III")
 ```
 
-```{r model corn unmarketable count trt level, results='hide', message=FALSE, warning=FALSE}
-# test if treatments are different from each other
-model.umcount2<- lmer(count ~ Trt_plnt * Trt_crmp * weediness + ( 1 | Rep), data=dir6trt)
-summary(model.umcount2)
-anova(model.umcount2)
-
-## model reduction
-model.umcount2.best<- get_model(lmerTest::step(model.umcount2, reduce.random=F))
-summary(model.umcount2.best)
-anova(model.umcount2.best)
-### best model: count ~ (1 | Rep)
-```
-
-```{r corn unmarketable count model assumptions, results='hide', message=FALSE, warning=FALSE}
+```{r corn unmarketable count trt vs ctrl assumptions, results='hide', message=FALSE, warning=FALSE}
 # check residuals
-resid.model.umcount<- resid(model.umcount2.best)
-pred.model.umcount<- predict(model.umcount2.best)
+resid.model.umcount<- resid(model.umcount.best)
+pred.model.umcount<- predict(model.umcount.best)
 
 # check randomness
 plot(pred.model.umcount, resid.model.umcount, ylab="Residuals", xlab="Corn unmarketable count", main="Predictecd vs Residuals") 
@@ -6072,25 +6085,120 @@ shapiro.test(resid.model.umcount)
 # test assumptions met
 ```
 
-```{r corn unmarketable count difference of means}
-# no main effects
+```{r corn unmarketable count trt vs ctrl means}
+ummean<- emmeans(model.umcount.best, pairwise ~ Trt_num*Weediness)
+ummean
 ```
+
+*Best Model:*
+UM_count ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+                    Chisq Df Pr(>Chisq)    
+(Intercept)       51.6555  1  6.614e-13 ***
+Trt_num           30.2039  5  1.345e-05 ***
+Weediness          5.6376  1    0.01758 *  
+Trt_num:Weediness 14.1215  5    0.01486 *  
+
+*Assumptions:*
+great
+
+*Means:*
+ Trt_num Weediness emmean    SE  df asymp.LCL asymp.UCL
+ 1       W           2.30 0.320 Inf      1.68      2.93
+ 2       W           2.31 0.320 Inf      1.68      2.94
+ 3       W           2.69 0.317 Inf      2.07      3.31
+ 4       W           2.62 0.318 Inf      2.00      3.24
+ 5       W           2.73 0.317 Inf      2.11      3.35
+ 6       W           2.54 0.318 Inf      1.92      3.16
+ 1       WF          2.56 0.318 Inf      1.94      3.19
+ 2       WF          2.66 0.317 Inf      2.03      3.28
+ 3       WF          2.73 0.317 Inf      2.11      3.35
+ 4       WF          2.56 0.318 Inf      1.94      3.19
+ 5       WF          2.66 0.317 Inf      2.03      3.28
+ 6       WF          2.55 0.318 Inf      1.92      3.17
+
+*Comparisons:*
+
+
+
+```{r model corn unmarketable count trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.umcounttrt1<- glmer(UM_count ~ Trt_plnt * Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrt1) # AIC: 671.5
+
+model.umcounttrt2<- glmer(UM_count ~ Trt_plnt * Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrt2) # AIC: 664.6
+
+model.umcounttrt3<- glmer(UM_count ~ Trt_plnt * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrt3) # AIC: 671.7
+
+model.umcounttrt4<- glmer(UM_count ~ Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrt4) # AIC: 664.9
+
+model.umcounttrt5<- glmer(UM_count ~ Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrt5) # AIC: 661.1 -> best
+
+model.umcounttrt6<- glmer(UM_count ~ 1 + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrt6) # AIC: 666.4
+
+model.umcounttrt6<- glmer(UM_count ~ Trt_plnt + Trt_crmp + Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrt6) # AIC: 664.5
+
+model.umcounttrt7<- glmer(UM_count ~ Trt_plnt + Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+summary(model.umcounttrt7) # AIC: 662.7
+
+
+model.umcounttrt.best<- glmer(UM_count ~ Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt, family=poisson(link="log"))
+Anova(model.umcount.best, type="III")
+```
+
+```{r corn unmarketable count model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.umcounttrt<- resid(model.umcounttrt.best)
+pred.model.umcounttrt<- predict(model.umcounttrt.best)
+
+# check randomness
+plot(pred.model.umcounttrt, resid.model.umcounttrt, ylab="Residuals", xlab="Corn unmarketable count", main="Predictecd vs Residuals") 
+
+# check normality
+hist(resid.model.umcounttrt, main="Histogram of Residuals", xlab="Corn unmarketable count") 
+
+qqnorm(resid.model.umcounttrt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.umcounttrt)
+# test assumptions met
+```
+
+```{r corn unmarketable count difference of means}
+ummeantrt<- emmeans(model.umcounttrt.best, pairwise ~ Trt_crmp, type="response")
+ummeantrt
+```
+*Best Model:*
+UM_count ~ Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+                    Chisq Df Pr(>Chisq)    
+(Intercept)       51.6555  1  6.614e-13 ***
+Trt_num           30.2039  5  1.345e-05 ***
+Weediness          5.6376  1    0.01758 *  
+Trt_num:Weediness 14.1215  5    0.01486 *
+
+*Assumptions:*
+Good
+
+*Means:*
+ Trt_crmp rate   SE  df asymp.LCL asymp.UCL
+ E        12.6 4.34 Inf      6.45      24.8
+ N        14.4 4.95 Inf      7.37      28.3
+
+*Comparisons:*
+ contrast ratio    SE  df z.ratio p.value
+ E / N    0.876 0.043 Inf -2.698  0.0070 *
 
 
 ### corn unmarketable weight
-
-```{r unmarketable weight data modifications, results='hide', message=FALSE, warning=FALSE}
-# use dir
-# make long form for weedy/weed-free
-dir7 <- dir %>%
-  gather(key = "weediness", value = "weight", W_UM_wt,	WF_UM_wt) %>%
-  convert_as_factor(Plot, weediness)
-
-dir7$Trt_num<- as.factor(dir7$Trt_num)
-
-# remove control for comparing treatments
-dir7trt<- subset(dir7, Trt_plnt=="E"|Trt_plnt=="N")
-```
 
 ```{r plot corn unmarketable weight}
 umwt<- ggplot(dir7, aes(x = weediness, y = weight)) + 
@@ -6124,58 +6232,22 @@ print(umwt)
 # weed-free higher in most cases, more in wf ctrls than wf trts, more in w trts than w ctrls
 ```
 
-```{r plot corn unmarketable weight rep effect, results='hide', message=FALSE, warning=FALSE}
-umwtrep<- ggplot(dir7, aes(x = Rep, y = weight)) +
-          geom_boxplot() +
-          theme_bw()
-print(umwtrep)
-# no apparent rep effects
-
-# anova of reps to determine if statistically different
-umwtrep<- anova_test(weight ~ Rep, data=dir7)
-umwtrep
-# not significant
-```
-
 ```{r model corn unmarketable weight trt vs control}
 # first test if treatments are different from control
-model.umwt1<- lmer(weight ~ Trt_num * weediness + ( 1 | Rep), data=dir7)
-summary(model.umwt1)
-anova(model.umwt1)
+model.umwt<- lmer(UM_wt ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dir)
+summary(model.umwt)
+anova(model.umwt)
 
 ## model reduction
-model.umwt1.best<- get_model(lmerTest::step(model.umwt1, reduce.random=F))
-summary(model.umwt1.best)
-anova(model.umwt1.best)
-### best model: weight ~ Trt_num * weediness + (1 | Rep)
-
-umwtmean1<- emmeans(model.umwt1.best, pairwise ~ Trt_num*weediness)
-umwtmean1
-# weedy ctrl 1 lower than weedy trt 4
-# weedy ctrl 2 not diff from weedy trts
-# wf ctrls not diff from wf trts
-
-plot(umwtmean1)
-# trend almost reverses for wf vs weedy
+model.umwt.best<- get_model(lmerTest::step(model.umwt, reduce.random=F))
+summary(model.umwt.best)
+anova(model.umwt.best)
 ```
 
-```{r model corn unmarketable weight trt level, results='hide', message=FALSE, warning=FALSE}
-# test if treatments are different from each other
-model.umwt2<- lmer(weight ~ Trt_plnt * Trt_crmp * weediness + ( 1 | Rep), data=dir7trt)
-summary(model.umwt2)
-anova(model.umwt2)
-
-## model reduction
-model.umwt2.best<- get_model(lmerTest::step(model.umwt2, reduce.random=F))
-summary(model.umwt2.best)
-anova(model.umwt2.best)
-### best model: weight ~ Trt_plnt + (1 | Rep)
-```
-
-```{r corn unmarketable weight model assumptions, results='hide', message=FALSE, warning=FALSE}
+```{r corn unmarketable weight trt vs crtl assumptions, results='hide', message=FALSE, warning=FALSE}
 # check residuals
-resid.model.umwt<- resid(model.umwt2.best)
-pred.model.umwt<- predict(model.umwt2.best)
+resid.model.umwt<- resid(model.umwt.best)
+pred.model.umwt<- predict(model.umwt.best)
 
 # check randomness
 plot(pred.model.umwt, resid.model.umwt, ylab="Residuals", xlab="Corn unmarketable weight", main="Predictecd vs Residuals") # divided in 2
@@ -6190,12 +6262,94 @@ shapiro.test(resid.model.umwt)
 # test assumptions mostly met
 ```
 
-```{r corn unmarketable weight difference of means}
-umwtmean2<- emmeans(model.umwt2.best, pairwise ~ Trt_plnt)
-umwtmean2
-# 0.278kg more unmarketable weight in North planted rye than East
-# no idea why that would be...
+```{r corn unmarketable wt trt vs ctrl means}
+umwtmean<- emmeans(model.umwt.best, pairwise ~ Trt_num*Weediness)
+umwtmean
 ```
+
+*Best Model:*
+UM_wt ~ Trt_num * Weediness + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+                   Sum Sq Mean Sq NumDF  DenDF F value    Pr(>F)    
+Trt_num           25.0974  5.0195     5 129.96  9.4599 1.035e-07 ***
+Weediness          2.5117  2.5117     1 129.96  4.7336   0.03139 *  
+Trt_num:Weediness  8.3374  1.6675     5 129.96  3.1426   0.01035 *  
+
+*Assumptions:*
+Fine
+
+*Means:*
+Trt_num Weediness emmean    SE   df lower.CL upper.CL
+ 1       W          0.150 0.839 1.96    -3.53     3.83
+ 2       W          0.115 0.839 1.96    -3.56     3.79
+ 3       W          1.359 0.839 1.96    -2.32     5.04
+ 4       W          1.421 0.839 1.96    -2.26     5.10
+ 5       W          1.808 0.839 1.96    -1.87     5.49
+ 6       W          1.102 0.839 1.96    -2.58     4.78
+ 1       WF         0.920 0.839 1.96    -2.76     4.60
+ 2       WF         1.132 0.839 1.96    -2.55     4.81
+ 3       WF         1.586 0.839 1.96    -2.09     5.26
+ 4       WF         1.341 0.839 1.96    -2.34     5.02
+ 5       WF         1.460 0.839 1.96    -2.22     5.14
+ 6       WF         1.099 0.839 1.96    -2.58     4.78
+
+*Comparisons:*
+
+
+
+```{r model corn unmarketable weight trt level, results='hide', message=FALSE, warning=FALSE}
+# test if treatments are different from each other
+model.umwttrt<- lmer(UM_wt ~ Trt_plnt * Trt_crmp * Weediness + (1 | Year/Rep) + (1 | Location/Rep), data=dirtrt)
+summary(model.umwttrt)
+anova(model.umwttrt)
+
+## model reduction
+model.umwttrt.best<- get_model(lmerTest::step(model.umwttrt, reduce.random=F))
+summary(model.umwttrt.best)
+anova(model.umwttrt.best)
+```
+
+```{r corn unmarketable weight model assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.umwttrt<- resid(model.umwttrt.best)
+pred.model.umwttrt<- predict(model.umwttrt.best)
+
+# check randomness
+plot(pred.model.umwttrt, resid.model.umwttrt, ylab="Residuals", xlab="Corn unmarketable weight", main="Predictecd vs Residuals") # divided in 2
+
+# check normality
+hist(resid.model.umwttrt, main="Histogram of Residuals", xlab="Corn unmarketable weight") # not normal 
+
+qqnorm(resid.model.umwttrt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.umwttrt)
+# test assumptions mostly met
+```
+
+```{r corn unmarketable weight difference of means}
+umwttrtmean<- emmeans(model.umwttrt.best, pairwise ~ Trt_crmp)
+umwttrtmean
+```
+*Best Model:*
+UM_wt ~ Trt_crmp + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+         Sum Sq Mean Sq NumDF  DenDF F value  Pr(>F)  
+Trt_crmp  2.345   2.345     1 83.009  4.6109 0.03469 *
+
+*Assumptions:*
+Fine
+
+*Means:*
+ Trt_crmp emmean   SE   df lower.CL upper.CL
+ E          1.11 1.11 1.69    -4.58     6.81
+ N          1.42 1.11 1.69    -4.27     7.12
+
+*Comparisons:*
+ contrast estimate    SE   df t.ratio p.value
+ E - N      -0.313 0.146 84.9 -2.147  0.0346 *
 
 
 ### total weed count
@@ -6325,7 +6479,7 @@ plot(wcountmean4)
 ```{r weed weight data modifications, results='hide', message=FALSE, warning=FALSE}
 # table with sums of weed counts & standard deviation for within each combination of rye planting direction, rye crimping/corn planting direction, and time 
 wtab2<-subset(dirw, Time=="56DAT") %>%
-  group_by(Plot, Rep, Trt_num, Trt_plnt, Trt_crmp) %>%
+  group_by(Location, Year, Plot, Rep, Trt_num, Trt_plnt, Trt_crmp) %>%
   summarize(WeightSum=sum(Weight), WSD=sd(Weight))
 
 wtab2trt<- subset(wtab2, Trt_plnt=="E"|Trt_plnt=="N")
@@ -6349,32 +6503,55 @@ print(weedw)
 # No apparent benefit to perpendicular crimping -- appears almost worse?
 ```
 
-```{r plot weed weight rep effect, results='hide', message=FALSE, warning=FALSE}
-weedwrep<- ggplot(wtab2, aes(x = Rep, y = WeightSum)) +
-          geom_boxplot() +
-          theme_bw()
-print(weedwrep)
-# no apparent rep effects
-
-# anova of reps to determine if statistically different
-# weedwrep<- anova_test(CountSum ~ Rep, data=wtab2) # not working for some reason
-# weedwrep
-# 
-```
-
 ```{r model weed weight trt vs control}
 # first test if treatments are different from control
-model.wwt1<- lmer(WeightSum ~ Trt_num + ( 1 | Rep), data=wtab2)
-summary(model.wwt1)
-anova(model.wwt1)
+model.wwt<- lmer(WeightSum ~ Trt_num + (1 | Year/Rep) + (1 | Location/Rep), data=wtab2)
+summary(model.wwt)
+anova(model.wwt)
 
-wwtmean1<- emmeans(model.wwt1, pairwise ~ Trt_num)
-wwtmean1
-# ctrl 1 & 2 diff from all trts
-# no trts diff from each other
-
-plot(wwtmean1)
+model.wwt.best<- get_model(lmerTest::step(model.wwt, reduce.random=F))
+summary(model.wwt.best)
+anova(model.wwt.best)
 ```
+
+```{r weed weight model trt vs ctrl assumptions, results='hide', message=FALSE, warning=FALSE}
+# check residuals
+resid.model.wwt<- resid(model.wwt.best)
+pred.model.wwt<- predict(model.wwt.best)
+
+# check randomness
+plot(pred.model.wwt, resid.model.wwt, ylab="Residuals", xlab="Weed weights", main="Predictecd vs Residuals") # all in line
+
+# check normality
+hist(resid.model.wwt, main="Histogram of Residuals", xlab="Weed weights") # almost all same value
+
+qqnorm(resid.model.wwt) 
+
+# Shapiro-Wilk test
+shapiro.test(resid.model.wwt)
+# test assumptions not met but no trends
+```
+
+```{r weed wt trt vs ctrl means}
+wwtmean<- emmeans()
+```
+
+*Best Model:*
+ WeightSum ~ Trt_num + (1 | Year/Rep) + (1 | Location/Rep)
+
+*Effects:*
+        Sum Sq Mean Sq NumDF DenDF F value   Pr(>F)    
+Trt_num 390826   78165     5    42  10.599 1.25e-06 ***
+
+*Assumptions:*
+Randomness not great
+
+*Means:*
+
+
+*Comparisons:*
+
+
 
 ```{r model weed weight trt level, results='hide', message=FALSE, warning=FALSE}
 # test if treatments are different from each other

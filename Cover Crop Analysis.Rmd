@@ -658,34 +658,34 @@ Good but potential upper outlier
 
 *Comparisons:*
  contrast                                ratio     SE  df z.ratio p.value
- Early Pop_14DAt / Standard Pop_14DAt    0.392 0.0129 Inf -28.550 <.0001 
- Early Pop_14DAt / Early Pop_21DAT       0.862 0.0330 Inf  -3.892 0.0025 
- Early Pop_14DAt / Standard Pop_21DAT    0.759 0.0278 Inf  -7.548 <.0001 
- Early Pop_14DAt / Early Pop_28DAT       0.349 0.0114 Inf -32.322 <.0001 
- Early Pop_14DAt / Standard Pop_28DAT    0.570 0.0198 Inf -16.174 <.0001 
- Early Pop_14DAt / Early Pop_7DAT        1.304 0.0555 Inf   6.233 <.0001 
- Early Pop_14DAt / Standard Pop_7DAT     0.370 0.0121 Inf -30.526 <.0001 
- Standard Pop_14DAt / Early Pop_21DAT    2.198 0.0684 Inf  25.325 <.0001 
- Standard Pop_14DAt / Standard Pop_21DAT 1.936 0.0556 Inf  22.977 <.0001 
- Standard Pop_14DAt / Early Pop_28DAT    0.890 0.0211 Inf  -4.894 <.0001 
- Standard Pop_14DAt / Standard Pop_28DAT 1.456 0.0383 Inf  14.278 <.0001 
- Standard Pop_14DAt / Early Pop_7DAT     3.327 0.1207 Inf  33.142 <.0001 
+ Early Pop_14DAt / Standard Pop_14DAt    0.392 0.0129 Inf -28.550 <.0001 *
+ Early Pop_14DAt / Early Pop_21DAT       0.862 0.0330 Inf  -3.892 0.0025 *
+ Early Pop_14DAt / Standard Pop_21DAT    0.759 0.0278 Inf  -7.548 <.0001 *
+ Early Pop_14DAt / Early Pop_28DAT       0.349 0.0114 Inf -32.322 <.0001 *
+ Early Pop_14DAt / Standard Pop_28DAT    0.570 0.0198 Inf -16.174 <.0001 *
+ Early Pop_14DAt / Early Pop_7DAT        1.304 0.0555 Inf   6.233 <.0001 *
+ Early Pop_14DAt / Standard Pop_7DAT     0.370 0.0121 Inf -30.526 <.0001 *
+ Standard Pop_14DAt / Early Pop_21DAT    2.198 0.0684 Inf  25.325 <.0001 *
+ Standard Pop_14DAt / Standard Pop_21DAT 1.936 0.0556 Inf  22.977 <.0001 *
+ Standard Pop_14DAt / Early Pop_28DAT    0.890 0.0211 Inf  -4.894 <.0001 *
+ Standard Pop_14DAt / Standard Pop_28DAT 1.456 0.0383 Inf  14.278 <.0001 *
+ Standard Pop_14DAt / Early Pop_7DAT     3.327 0.1207 Inf  33.142 <.0001 *
  Standard Pop_14DAt / Standard Pop_7DAT  0.944 0.0221 Inf  -2.457 0.2142 
- Early Pop_21DAT / Standard Pop_21DAT    0.880 0.0309 Inf  -3.629 0.0069 
- Early Pop_21DAT / Early Pop_28DAT       0.405 0.0125 Inf -29.293 <.0001 
- Early Pop_21DAT / Standard Pop_28DAT    0.662 0.0219 Inf -12.458 <.0001 
- Early Pop_21DAT / Early Pop_7DAT        1.513 0.0625 Inf  10.038 <.0001 
- Early Pop_21DAT / Standard Pop_7DAT     0.429 0.0132 Inf -27.396 <.0001 
- Standard Pop_21DAT / Early Pop_28DAT    0.460 0.0132 Inf -27.000 <.0001 
- Standard Pop_21DAT / Standard Pop_28DAT 0.752 0.0232 Inf  -9.228 <.0001 
- Standard Pop_21DAT / Early Pop_7DAT     1.719 0.0683 Inf  13.631 <.0001 
- Standard Pop_21DAT / Standard Pop_7DAT  0.488 0.0139 Inf -25.217 <.0001 
- Early Pop_28DAT / Standard Pop_28DAT    1.635 0.0430 Inf  18.683 <.0001 
- Early Pop_28DAT / Early Pop_7DAT        3.737 0.1348 Inf  36.558 <.0001 
+ Early Pop_21DAT / Standard Pop_21DAT    0.880 0.0309 Inf  -3.629 0.0069 *
+ Early Pop_21DAT / Early Pop_28DAT       0.405 0.0125 Inf -29.293 <.0001 *
+ Early Pop_21DAT / Standard Pop_28DAT    0.662 0.0219 Inf -12.458 <.0001 *
+ Early Pop_21DAT / Early Pop_7DAT        1.513 0.0625 Inf  10.038 <.0001 *
+ Early Pop_21DAT / Standard Pop_7DAT     0.429 0.0132 Inf -27.396 <.0001 *
+ Standard Pop_21DAT / Early Pop_28DAT    0.460 0.0132 Inf -27.000 <.0001 *
+ Standard Pop_21DAT / Standard Pop_28DAT 0.752 0.0232 Inf  -9.228 <.0001 *
+ Standard Pop_21DAT / Early Pop_7DAT     1.719 0.0683 Inf  13.631 <.0001 *
+ Standard Pop_21DAT / Standard Pop_7DAT  0.488 0.0139 Inf -25.217 <.0001 *
+ Early Pop_28DAT / Standard Pop_28DAT    1.635 0.0430 Inf  18.683 <.0001 *
+ Early Pop_28DAT / Early Pop_7DAT        3.737 0.1348 Inf  36.558 <.0001 *
  Early Pop_28DAT / Standard Pop_7DAT     1.061 0.0248 Inf   2.510 0.1910 
- Standard Pop_28DAT / Early Pop_7DAT     2.286 0.0869 Inf  21.758 <.0001 
- Standard Pop_28DAT / Standard Pop_7DAT  0.649 0.0169 Inf -16.655 <.0001 
- Early Pop_7DAT / Standard Pop_7DAT      0.284 0.0102 Inf -34.936 <.0001 
+ Standard Pop_28DAT / Early Pop_7DAT     2.286 0.0869 Inf  21.758 <.0001 *
+ Standard Pop_28DAT / Standard Pop_7DAT  0.649 0.0169 Inf -16.655 <.0001 *
+ Early Pop_7DAT / Standard Pop_7DAT      0.284 0.0102 Inf -34.936 <.0001 *s
 
 
 ### Corn VT stage
@@ -719,6 +719,10 @@ summary(model.stand2) # AIC: 1728.7
 model.stand.best<- glmer(Corn_stand ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw, family=poisson(link="log"))
 Anova(model.stand.best, type="III")
 
+# assumptions (hist) better w/ lmer
+model.stand.best<- lmer((Corn_stand) ~ Trt_code + (1 | Year / Rep) + (1 | Location / Rep), data=datw)
+anova(model.stand.best)
+
 # check residuals
 resid.model.stand<- resid(model.stand.best)
 pred.model.stand<- predict(model.stand.best)
@@ -744,57 +748,53 @@ plot(standemmeans, comparisons=T)
 Corn_stand ~ Trt_code + (1 | Year/Rep) + (1 | Location/Rep)
 
 *Effects:*
-         npar Sum Sq Mean Sq F value
-Trt_code    7 22.683  3.2404  3.2404
-
-               Chisq Df Pr(>Chisq)    
-(Intercept) 1651.229  1  < 2.2e-16 ***
-Trt_code      22.695  7   0.001926 ** 
+         Sum Sq Mean Sq NumDF  DenDF F value  Pr(>F)  
+Trt_code 709.11   101.3     7 222.27  2.5881 0.01386 *
 
 *Assumptions:*
 slightly left skewed
 
 *Means:*
- Trt_code rate   SE  df asymp.LCL asymp.UCL
- E1W1N    31.5 2.68 Inf      26.7      37.2
- E2W1N    30.6 2.60 Inf      25.9      36.2
- E3W1N    30.6 2.60 Inf      25.9      36.1
- S1W1N    29.7 2.51 Inf      25.1      35.0
- S2W1N    30.2 2.55 Inf      25.6      35.7
- S3W1N    32.6 2.74 Inf      27.7      38.5
- W1N      26.7 2.27 Inf      22.6      31.5
- WF1N     29.5 2.49 Inf      25.0      34.8
+ Trt_code response   SE   df lower.CL upper.CL
+ E1W1N        31.8 2.91 4.31     24.0     39.7
+ E2W1N        30.9 2.91 4.31     23.0     38.8
+ E3W1N        30.9 2.91 4.31     23.0     38.7
+ S1W1N        29.9 2.88 4.13     22.0     37.8
+ S2W1N        30.5 2.88 4.13     22.6     38.4
+ S3W1N        32.9 2.88 4.13     25.0     40.9
+ W1N          26.8 2.88 4.13     18.9     34.7
+ WF1N         29.7 2.88 4.13     21.8     37.6
 
 *Contrasts:*
- contrast      ratio     SE  df z.ratio p.value
- E1W1N / E2W1N 1.030 0.0487 Inf  0.615  0.9987 
- E1W1N / E3W1N 1.031 0.0488 Inf  0.639  0.9983 
- E1W1N / S1W1N 1.063 0.0491 Inf  1.312  0.8948 
- E1W1N / S2W1N 1.042 0.0480 Inf  0.899  0.9863 
- E1W1N / S3W1N 0.966 0.0437 Inf -0.775  0.9944 
- E1W1N / W1N   1.181 0.0560 Inf  3.508  0.0107 *
- E1W1N / WF1N  1.068 0.0494 Inf  1.421  0.8479 
- E2W1N / E3W1N 1.001 0.0477 Inf  0.024  1.0000 
- E2W1N / S1W1N 1.032 0.0481 Inf  0.677  0.9976 
- E2W1N / S2W1N 1.012 0.0469 Inf  0.265  1.0000 
- E2W1N / S3W1N 0.938 0.0427 Inf -1.407  0.8543 
- E2W1N / W1N   1.147 0.0548 Inf  2.874  0.0778 
- E2W1N / WF1N  1.037 0.0484 Inf  0.787  0.9938 
- E3W1N / S1W1N 1.031 0.0480 Inf  0.653  0.9981 
- E3W1N / S2W1N 1.011 0.0469 Inf  0.240  1.0000 
- E3W1N / S3W1N 0.937 0.0427 Inf -1.432  0.8427 
- E3W1N / W1N   1.146 0.0548 Inf  2.850  0.0832 
- E3W1N / WF1N  1.036 0.0483 Inf  0.762  0.9949 
- S1W1N / S2W1N 0.981 0.0442 Inf -0.428  0.9999 
- S1W1N / S3W1N 0.909 0.0402 Inf -2.164  0.3736 
- S1W1N / W1N   1.112 0.0517 Inf  2.276  0.3070 
- S1W1N / WF1N  1.005 0.0455 Inf  0.113  1.0000 
- S2W1N / S3W1N 0.926 0.0408 Inf -1.737  0.6628 
- S2W1N / W1N   1.133 0.0525 Inf  2.703  0.1217 
- S2W1N / WF1N  1.025 0.0462 Inf  0.541  0.9994 
- S3W1N / W1N   1.223 0.0556 Inf  4.430  0.0003 *
- S3W1N / WF1N  1.106 0.0490 Inf  2.277  0.3060 
- W1N / WF1N    0.904 0.0421 Inf -2.163  0.3747 
+ contrast      estimate   SE  df t.ratio p.value
+ E1W1N - E2W1N   0.9286 1.67 218  0.555  0.9993 
+ E1W1N - E3W1N   0.9643 1.67 218  0.577  0.9991 
+ E1W1N - S1W1N   1.9444 1.62 218  1.198  0.9320 
+ E1W1N - S2W1N   1.3507 1.62 218  0.832  0.9911 
+ E1W1N - S3W1N  -1.1181 1.62 218 -0.689  0.9972 
+ E1W1N - W1N     5.0069 1.62 218  3.084  0.0468 *
+ E1W1N - WF1N    2.1007 1.62 218  1.294  0.9004 
+ E2W1N - E3W1N   0.0357 1.67 218  0.021  1.0000 
+ E2W1N - S1W1N   1.0159 1.62 218  0.626  0.9985 
+ E2W1N - S2W1N   0.4221 1.62 218  0.260  1.0000 
+ E2W1N - S3W1N  -2.0466 1.62 218 -1.261  0.9122 
+ E2W1N - W1N     4.0784 1.62 218  2.512  0.1960 
+ E2W1N - WF1N    1.1721 1.62 218  0.722  0.9963 
+ E3W1N - S1W1N   0.9802 1.62 218  0.604  0.9988 
+ E3W1N - S2W1N   0.3864 1.62 218  0.238  1.0000 
+ E3W1N - S3W1N  -2.0823 1.62 218 -1.283  0.9045 
+ E3W1N - W1N     4.0427 1.62 218  2.490  0.2053 
+ E3W1N - WF1N    1.1364 1.62 218  0.700  0.9969 
+ S1W1N - S2W1N  -0.5938 1.56 218 -0.380  0.9999 
+ S1W1N - S3W1N  -3.0625 1.56 218 -1.958  0.5127 
+ S1W1N - W1N     3.0625 1.56 218  1.958  0.5127 
+ S1W1N - WF1N    0.1562 1.56 218  0.100  1.0000 
+ S2W1N - S3W1N  -2.4688 1.56 218 -1.578  0.7627 
+ S2W1N - W1N     3.6562 1.56 218  2.338  0.2782 
+ S2W1N - WF1N    0.7500 1.56 218  0.480  0.9997 
+ S3W1N - W1N     6.1250 1.56 218  3.916  0.0030 *
+ S3W1N - WF1N    3.2188 1.56 218  2.058  0.4456 
+ W1N - WF1N     -2.9062 1.56 218 -1.858  0.5811  
 
 
 ```{r corn stand analysis -- trts}
@@ -811,6 +811,11 @@ model.standtrt5<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep)
 summary(model.standtrt5) # AIC: 1183.2
 
 model.standtrt.best<- glmer(Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt, family=poisson(link="log"))
+anova(model.standtrt.best)
+
+# lmer
+model.standtrt.best<- get_model(lmerTest::step((lmer(Corn_stand ~ Cult * SR + (1 | Year / Rep) + (1 | Location / Rep), data=datwtrt)), reduce.random=F))
+summary(model.standtrt.best)
 anova(model.standtrt.best)
 
 # check residuals
@@ -837,7 +842,7 @@ Corn_stand ~ 1 + (1 | Year / Rep) + (1 | Location / Rep)
 
 
 *Assumptions:*
-slightly left skewed -- transform glmer?
+slightly left skewed -- transform glmer? --> changed to lmer & better
 
 *Means:*
 None

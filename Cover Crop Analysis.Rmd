@@ -5616,6 +5616,13 @@ height<- ggplot(dir, aes(x = Trt_num, y = Corn_ht_av, fill=Weediness)) +
           geom_boxplot() +
           theme_bw()
 print(height)
+
+height<- ggplot(dir, aes(x = Trt_num, y = Corn_ht_av)) + 
+          geom_bar() +
+          geom_errorbar() + 
+          theme_bw()
+print(height)
+
 # weediness only affects control plots so possibly elevating above graph
 ```
 

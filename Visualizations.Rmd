@@ -1,0 +1,130 @@
+---
+title: "Graphs"
+author: "Hayley Brackenridge"
+date: '2021-10-24'
+output: html_document
+---
+# Preamble
+
+Graphs for presentations & dissertation
+
+# VAR
+
+## load datasets
+```{r load VAR datasets, results='hide', message=FALSE, warning=FALSE, 'load-data-&-packages'}
+# load datasets
+dat<- read.csv("VAR_All.csv")
+str(dat) # view data variables & adjust type as necessary
+dat$Plot<- as.factor(dat$Plot)
+dat$Rep<- as.factor(dat$Rep)
+dat$SR<- as.factor(dat$SR)
+dat$VT_date<- as.Date(dat$VT_date, "%Y-%m-%d")
+dat$VT_date<- format(dat$VT_date, "%j")
+dat$VT_date<- as.integer(dat$VT_date, "%j")
+dat$anthesis<- as.Date(dat$anthesis, "%Y-%m-%d")
+dat$anthesis<- format(dat$anthesis, "%j")
+dat$anthesis<- as.integer(dat$anthesis, "%j")
+
+dat<- subset(dat, Nitro=="1") # remove 2N trt
+dattrt<- subset(dat, !is.na(dat$Cult)) # dattrt contains only trt plots (no ctrls)
+
+# WF data
+datwf<- subset(dat, Weediness=="WF") # datwf contains only WF trts & ctrls
+datwftrt<- subset(datwf, !is.na(datwf$Cult)) # datwftrt contains only WF trt plots (no ctrls)
+
+# W data
+datw<- subset(dat, Trt_num<9) # datw does not contain WF rye trts
+datwtrt<- subset(datw, !(is.na(datw$Cult))) # datwtrt contains only weedy trt plots (no ctrls)
+
+# StJean data w/ W/WF factor
+Sdatw<- subset(dattrt, Year!="2019"&Location=="StJean") # subset for only StJean data in 2020 & 2021
+Sdatw<- subset(Sdatw, Trt_num==4 | Trt_num==7 | Trt_num==11 | Trt_num==14) # subset for only plots w/ W/WF factor
+Sdatw1<- subset(Sdatw, Year=="2020") # contains both cultivars
+Sdatw2<- subset(Sdatw, Year=="2021") # contains Std only
+
+# Harrow data w/ W/WF factor
+Hdatw<- subset(dattrt, Location=="Harrow"&Year!="2019") # subset for only Harrow data in 2020 & 2021
+Hdatw1<- subset(Hdatw, SR=="600") # subset for only H SR to compliment StJean data 2020
+Hdatw2<- subset(Hdatw1, Cult=="Standard") # subset for only Std to compliment StJean data 2021
+
+# combine Harrow & StJean data
+datw1<- rbind(Hdatw1, Sdatw1) # contains both Harrow & StJean data w/ W/WF factor for S & E @ 600
+datw2<- rbind(Hdatw2, Sdatw2) # contains both Harrow & StJean data w/ W/WF factor for S @ 600
+
+# Harrow data WF
+Hdatwf<- subset(datwf, Location=="Harrow"&Year!="2019")
+Hdatwf1<- subset(Hdatwf, SR=="600"|is.na(Hdatwf$SR))
+Hdatwf2<- subset(Hdatwf1, Cult!="Early"|is.na(Hdatwf1$Cult))
+
+# StJean data WF
+Sdatwf<- subset(datwf, Year!="2019"&Location=="StJean")
+Sdatwf1<- subset(Sdatwf, Year=="2020") # contains both cultivars
+Sdatwf2<- subset(Sdatwf, Year=="2021") # contains Std only
+
+# combine Harrow & StJean WF data
+datwf1<- rbind(Hdatwf1, Sdatwf1) # contains both Harrow & StJean WF data for both cult @ 600 
+datwf2<- rbind(Hdatwf2, Sdatwf2) # contains both Harrow & StJean WF data for S 600
+
+# Harrow data WF trts
+Hdatwftrt<- subset(datwftrt, Location=="Harrow"&Year!="2019")
+Hdatwftrt1<- subset(Hdatwftrt, SR=="600")
+Hdatwftrt2<- subset(Hdatwftrt1, Cult=="Standard")
+
+# StJean data WF trts
+Sdatwftrt<- subset(datwftrt, Location=="StJean"&Year!="2019")
+Sdatwftrt1<- subset(Sdatwftrt, Year=="2020")
+Sdatwftrt2<- subset(Sdatwftrt, Year=="2021")
+
+# combine Harrow & StJean WF trt data
+datwftrt1<- rbind(Hdatwftrt1, Sdatwftrt1)
+datwftrt2<- rbind(Hdatwftrt2, Sdatwftrt2)
+```
+```{r load VAR weeds data}
+wdat<- read.csv("VAR_Weeds_Reduced.csv")
+str(wdat) # view data variables & adjust type as necessary
+wdat$Plot<- as.factor(wdat$Plot)
+wdat$Rep<- as.factor(wdat$Rep)
+wdat$Trt_num<- as.factor(wdat$Trt_num)
+wdat$SR<- as.factor(wdat$SR)
+
+wdat<- subset(wdat, Nitro=="1")
+
+wdattrt<- subset(wdat, !is.na(wdat$Cult)) # dattrt contains only trt plots (no ctrls)
+```
+```{r load packages}
+# load packages
+library(ggplot2)
+library(dplyr)
+library(car)
+library(lme4)
+library(lmerTest)
+library(ggpubr)
+library(lsmeans)
+library(emmeans)
+library(tidyr)
+library(cAIC4)
+library(Rmisc)
+```
+```{r rye biomass}
+ryewtplot<- ggplot(subset(datwtrt, Cult=="Standard"|Cult=="Early"), aes(x = SR, y = Rye_wt)) +
+          geom_boxplot() +
+          theme_bw()
+print(ryewtplot)
+
+out<- boxplot.stats(datwtrt$Rye_wt)$out
+out_ind <- which(datwtrt$Rye_wt %in% c(out))
+out_ind
+datwtrtout<-datwtrt[-c(out_ind),]
+
+ryewtplot<- ggplot(subset(datwtrtout, Cult=="Standard"|Cult=="Early"), aes(x = SR, y = Rye_wt)) +
+          geom_boxplot() +
+          theme_bw()
+print(ryewtplot)
+```
+
+```{r rye by weed ctrl}
+# make table of total weed biomass in each plot
+WWtable<-subset(wdattrt, Time=="56DAT") %>%
+  group_by("Year", "Location", "Cult", "SR", "Plot", "Rep", "Trt_num") %>%
+  summarize(Sum=sum(Weight, na.rm=T))
+```
